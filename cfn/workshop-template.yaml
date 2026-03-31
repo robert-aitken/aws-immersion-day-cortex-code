@@ -1,0 +1,495 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  CoCo Workshop — AI-Accelerated Data Engineering with Snowflake + AWS.
+  Provisions: EC2 jumphost, Amazon MWAA, S3, IAM roles, and QuickSight dataset.
+
+# ===========================================================================
+# Parameters
+# ===========================================================================
+Parameters:
+  SnowflakeAccount:
+    Type: String
+    Description: Snowflake account identifier (e.g. xy12345.us-east-1)
+
+  SnowflakeUser:
+    Type: String
+    Description: Snowflake username for the workshop
+
+  SnowflakePAT:
+    Type: String
+    NoEcho: true
+    Description: Snowflake Programmatic Access Token
+
+  SnowflakeWarehouse:
+    Type: String
+    Default: COCO_WORKSHOP_WH
+    Description: Snowflake warehouse name
+
+  SnowflakeDatabase:
+    Type: String
+    Default: COCO_WORKSHOP
+    Description: Snowflake database name
+
+  SnowflakeRole:
+    Type: String
+    Default: COCO_WORKSHOP_ROLE
+    Description: Snowflake role for the workshop
+
+  EC2InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.micro, t3.small, t3.medium, t3.large]
+    Description: EC2 instance type for the jumphost
+
+  MWAAEnvironmentClass:
+    Type: String
+    Default: mw1.small
+    AllowedValues: [mw1.small, mw1.medium, mw1.large]
+    Description: MWAA environment class
+
+  LatestAL2023Ami:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+    Description: Amazon Linux 2023 AMI (auto-resolved via SSM)
+
+# ===========================================================================
+# Resources
+# ===========================================================================
+Resources:
+
+  # -------------------------------------------------------------------------
+  # S3 Bucket — stores MWAA DAGs, seed data, and workshop artifacts
+  # -------------------------------------------------------------------------
+  WorkshopBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'coco-workshop-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: coco-immersion-day
+
+  # -------------------------------------------------------------------------
+  # IAM Role — EC2 jumphost (SSM, S3, MWAA, QuickSight)
+  # -------------------------------------------------------------------------
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: coco-workshop-ec2-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: coco-workshop-ec2-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3Access
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                  - s3:DeleteObject
+                Resource:
+                  - !GetAtt WorkshopBucket.Arn
+                  - !Sub '${WorkshopBucket.Arn}/*'
+              - Sid: MWAAAccess
+                Effect: Allow
+                Action:
+                  - airflow:CreateCliToken
+                  - airflow:CreateWebLoginToken
+                  - airflow:InvokeRestApi
+                Resource: !Sub 'arn:aws:airflow:${AWS::Region}:${AWS::AccountId}:environment/coco-workshop-mwaa'
+              - Sid: QuickSightAccess
+                Effect: Allow
+                Action:
+                  - quicksight:CreateIngestion
+                  - quicksight:DescribeIngestion
+                  - quicksight:ListIngestions
+                  - quicksight:ListDataSets
+                  - quicksight:DescribeDataSet
+                Resource: '*'
+              - Sid: GlueReadAccess
+                Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetDatabases
+                  - glue:GetTable
+                  - glue:GetTables
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: coco-immersion-day
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: coco-workshop-ec2-profile
+      Roles:
+        - !Ref EC2Role
+
+  # -------------------------------------------------------------------------
+  # Security Group — EC2 jumphost (egress-only, SSM needs no inbound)
+  # -------------------------------------------------------------------------
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: CoCo Workshop EC2 — egress only for SSM
+      GroupName: coco-workshop-ec2-sg
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound
+      Tags:
+        - Key: Name
+          Value: coco-workshop-ec2
+        - Key: Project
+          Value: coco-immersion-day
+
+  # -------------------------------------------------------------------------
+  # EC2 Jumphost — CoCo CLI + Snowflake CLI pre-installed
+  # -------------------------------------------------------------------------
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref EC2InstanceType
+      ImageId: !Ref LatestAL2023Ami
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      Tags:
+        - Key: Name
+          Value: coco-workshop-jumphost
+        - Key: Project
+          Value: coco-immersion-day
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -ex
+          exec > /var/log/coco-bootstrap.log 2>&1
+          echo "=== CoCo Workshop Bootstrap started at $(date) ==="
+
+          # System dependencies
+          dnf install -y python3-pip git jq
+
+          # Install CoCo CLI
+          su - ec2-user -c 'NON_INTERACTIVE=1 SKIP_PODMAN=1 SKIP_PATH_PROMPT=1 curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | sh'
+
+          # Install Snowflake CLI
+          su - ec2-user -c 'pip3 install --user snowflake-cli'
+
+          # PATH setup
+          su - ec2-user -c 'echo "export PATH=\$HOME/.local/bin:\$PATH" >> ~/.bashrc'
+
+          # Clone workshop repo
+          su - ec2-user -c 'git clone https://github.com/snowflake-labs/aws-immersion-day-cortex-code.git ~/workshop || true'
+
+          # Write Snowflake config
+          mkdir -p /home/ec2-user/.snowflake
+          cat > /home/ec2-user/.snowflake/config.toml << 'SNOWCFG'
+          default_connection_name = "DEMO"
+
+          [connections.DEMO]
+          account = "${SnowflakeAccount}"
+          user = "${SnowflakeUser}"
+          password = "${SnowflakePAT}"
+          role = "${SnowflakeRole}"
+          warehouse = "${SnowflakeWarehouse}"
+          database = "${SnowflakeDatabase}"
+          SNOWCFG
+
+          chmod 600 /home/ec2-user/.snowflake/config.toml
+          chown -R ec2-user:ec2-user /home/ec2-user
+
+          echo "=== Bootstrap complete at $(date) ==="
+
+  # -------------------------------------------------------------------------
+  # IAM Role — MWAA execution role
+  # -------------------------------------------------------------------------
+  MWAAExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: coco-workshop-mwaa-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - airflow.amazonaws.com
+                - airflow-env.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: coco-workshop-mwaa-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AirflowS3Access
+                Effect: Allow
+                Action:
+                  - s3:GetObject*
+                  - s3:GetBucket*
+                  - s3:List*
+                Resource:
+                  - !GetAtt WorkshopBucket.Arn
+                  - !Sub '${WorkshopBucket.Arn}/*'
+              - Sid: AirflowLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                  - logs:GetLogEvents
+                  - logs:GetLogRecord
+                  - logs:GetLogGroupFields
+                  - logs:GetQueryResults
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:airflow-coco-workshop-mwaa-*'
+              - Sid: AirflowMetrics
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+              - Sid: AirflowSQS
+                Effect: Allow
+                Action:
+                  - sqs:ChangeMessageVisibility
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ReceiveMessage
+                  - sqs:SendMessage
+                Resource: !Sub 'arn:aws:sqs:${AWS::Region}:*:airflow-celery-*'
+              - Sid: AirflowKMS
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                  - kms:DescribeKey
+                  - kms:GenerateDataKey*
+                  - kms:Encrypt
+                Resource: '*'
+                Condition:
+                  StringLike:
+                    kms:ViaService: !Sub 'sqs.${AWS::Region}.amazonaws.com'
+              - Sid: QuickSightRefresh
+                Effect: Allow
+                Action:
+                  - quicksight:CreateIngestion
+                  - quicksight:DescribeIngestion
+                  - quicksight:ListIngestions
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: coco-immersion-day
+
+  # -------------------------------------------------------------------------
+  # Amazon MWAA Environment
+  # -------------------------------------------------------------------------
+  MWAAEnvironment:
+    Type: AWS::MWAA::Environment
+    Properties:
+      Name: coco-workshop-mwaa
+      AirflowVersion: '2.9.2'
+      EnvironmentClass: !Ref MWAAEnvironmentClass
+      MaxWorkers: 2
+      SourceBucketArn: !GetAtt WorkshopBucket.Arn
+      DagS3Path: dags
+      ExecutionRoleArn: !GetAtt MWAAExecutionRole.Arn
+      AirflowConfigurationOptions:
+        core.default_timezone: utc
+      LoggingConfiguration:
+        DagProcessingLogs:
+          Enabled: true
+          LogLevel: INFO
+        SchedulerLogs:
+          Enabled: true
+          LogLevel: INFO
+        TaskLogs:
+          Enabled: true
+          LogLevel: INFO
+        WebserverLogs:
+          Enabled: true
+          LogLevel: INFO
+        WorkerLogs:
+          Enabled: true
+          LogLevel: INFO
+      NetworkConfiguration:
+        SecurityGroupIds:
+          - !Ref MWAASecurityGroup
+        SubnetIds:
+          - !Ref MWAASubnet1
+          - !Ref MWAASubnet2
+      WebserverAccessMode: PUBLIC_ONLY
+      Tags:
+        Project: coco-immersion-day
+
+  # -------------------------------------------------------------------------
+  # VPC resources for MWAA (requires private subnets with NAT)
+  # -------------------------------------------------------------------------
+  WorkshopVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.192.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: coco-workshop-vpc
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: coco-workshop-igw
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.192.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: coco-workshop-public
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  NATElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: coco-workshop-nat
+
+  MWAASubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.192.10.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: coco-workshop-mwaa-1
+
+  MWAASubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref WorkshopVPC
+      CidrBlock: 10.192.11.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: coco-workshop-mwaa-2
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref WorkshopVPC
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  MWAASubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MWAASubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  MWAASubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref MWAASubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  MWAASecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MWAA environment security group
+      VpcId: !Ref WorkshopVPC
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          SourceSecurityGroupId: !Ref MWAASecurityGroup
+          Description: Self-referencing rule for MWAA
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound
+      Tags:
+        - Key: Name
+          Value: coco-workshop-mwaa-sg
+
+  # Fix circular reference — add self-referencing ingress rule separately
+  MWAASecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref MWAASecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref MWAASecurityGroup
+      Description: Self-referencing rule for MWAA workers
+
+# ===========================================================================
+# Outputs
+# ===========================================================================
+Outputs:
+  EC2InstanceId:
+    Description: EC2 jumphost instance ID (connect via Session Manager)
+    Value: !Ref EC2Instance
+
+  SessionManagerURL:
+    Description: Session Manager URL to connect to the jumphost
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/systems-manager/session-manager/${EC2Instance}'
+
+  MWAAConsoleURL:
+    Description: MWAA Airflow UI URL
+    Value: !Sub 'https://${AWS::Region}.console.aws.amazon.com/mwaa/home#/environments/coco-workshop-mwaa'
+
+  WorkshopBucketName:
+    Description: S3 bucket for DAGs and seed data
+    Value: !Ref WorkshopBucket
+
+  SnowflakeAccountParam:
+    Description: Snowflake account used for this workshop
+    Value: !Ref SnowflakeAccount

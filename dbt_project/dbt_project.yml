@@ -1,0 +1,17 @@
+name: 'coco_workshop'
+version: '1.0.0'
+
+profile: 'coco_workshop'
+
+model-paths: ["models"]
+test-paths: ["tests"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  coco_workshop:
+    staging:
+      +schema: STAGING
+      +materialized: view
+    marts:
+      +schema: MARTS
+      +materialized: table

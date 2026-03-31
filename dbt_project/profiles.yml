@@ -1,0 +1,17 @@
+# profiles.yml — Template for the CoCo Workshop
+# On the EC2 jumphost this is pre-configured via ~/.dbt/profiles.yml
+# For local development, copy this file to ~/.dbt/profiles.yml and fill in credentials.
+
+coco_workshop:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', 'your-account') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', 'your-user') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
+      role: COCO_WORKSHOP_ROLE
+      warehouse: COCO_WORKSHOP_WH
+      database: COCO_WORKSHOP
+      schema: PUBLIC
+      threads: 4

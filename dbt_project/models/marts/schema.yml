@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: >
+      Order fact table joining order headers with aggregated line items.
+      Contains order-level metrics: item count, total units, and order total.
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+      - name: order_total
+        tests:
+          - not_null
+
+  - name: dim_customers
+    description: >
+      Customer dimension with lifetime metrics computed from fct_orders.
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: email
+        tests:
+          - unique
+          - not_null
+      - name: lifetime_revenue
+        tests:
+          - not_null

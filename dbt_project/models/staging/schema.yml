@@ -1,0 +1,35 @@
+version: 2
+
+sources:
+  - name: source_data
+    database: COCO_WORKSHOP
+    schema: SOURCE_DATA
+    tables:
+      - name: raw_orders
+        description: Raw order headers from the e-commerce platform
+        columns:
+          - name: order_id
+            tests:
+              - unique
+              - not_null
+      - name: raw_customers
+        description: Customer master data
+        columns:
+          - name: customer_id
+            tests:
+              - unique
+              - not_null
+      - name: raw_products
+        description: Product catalog
+        columns:
+          - name: product_id
+            tests:
+              - unique
+              - not_null
+      - name: raw_order_items
+        description: Line-level order items
+        columns:
+          - name: order_item_id
+            tests:
+              - unique
+              - not_null
