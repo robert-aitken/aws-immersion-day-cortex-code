@@ -95,9 +95,11 @@ Resources:
                 Effect: Allow
                 Action:
                   - s3:GetObject
+                  - s3:GetObjectVersion
                   - s3:PutObject
                   - s3:ListBucket
                   - s3:DeleteObject
+                  - s3:GetBucketLocation
                 Resource:
                   - !GetAtt WorkshopBucket.Arn
                   - !Sub '${WorkshopBucket.Arn}/*'
@@ -124,7 +126,63 @@ Resources:
                   - glue:GetDatabases
                   - glue:GetTable
                   - glue:GetTables
+                  - glue:GetPartition
+                  - glue:GetPartitions
+                  - glue:BatchGetPartition
+                  - glue:SearchTables
                 Resource: '*'
+              - Sid: GlueWriteAccess
+                Effect: Allow
+                Action:
+                  - glue:CreateDatabase
+                  - glue:CreateTable
+                  - glue:UpdateTable
+                  - glue:DeleteTable
+                  - glue:CreateCrawler
+                  - glue:GetCrawler
+                  - glue:StartCrawler
+                  - glue:StopCrawler
+                  - glue:UpdateCrawler
+                Resource:
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:catalog'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/coco_workshop'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:table/coco_workshop/*'
+                  - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/coco-workshop-*'
+              - Sid: SnowflakeTrustSetup
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:UpdateAssumeRolePolicy
+                Resource: !Sub 'arn:aws:iam::${AWS::AccountId}:role/coco-workshop-snowflake-integration-role'
+              - Sid: LakeFormationAccess
+                Effect: Allow
+                Action:
+                  - lakeformation:GetDataLakeSettings
+                  - lakeformation:PutDataLakeSettings
+                  - lakeformation:GrantPermissions
+                  - lakeformation:BatchGrantPermissions
+                  - lakeformation:RevokePermissions
+                  - lakeformation:BatchRevokePermissions
+                  - lakeformation:RegisterResource
+                  - lakeformation:DeregisterResource
+                  - lakeformation:GetDataAccess
+                  - lakeformation:ListPermissions
+                  - lakeformation:ListResources
+                Resource: '*'
+              - Sid: CloudFormationReadAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:ListStacks
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:GetTemplate
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/coco-workshop/*'
+              - Sid: MWAAReadAccess
+                Effect: Allow
+                Action:
+                  - airflow:GetEnvironment
+                  - airflow:ListEnvironments
+                Resource: !Sub 'arn:aws:airflow:${AWS::Region}:${AWS::AccountId}:environment/coco-workshop-mwaa'
       Tags:
         - Key: Project
           Value: coco-immersion-day
@@ -137,13 +195,86 @@ Resources:
         - !Ref EC2Role
 
   # -------------------------------------------------------------------------
+  # IAM Role — Snowflake integration (storage + Glue catalog linked database)
+  #
+  # Trust policy uses a placeholder principal. After running:
+  #   CREATE STORAGE INTEGRATION ... in Snowflake
+  #   DESC INTEGRATION ...
+  # the participant (via CoCo CLI) updates this trust with the real
+  # STORAGE_AWS_IAM_USER_ARN and STORAGE_AWS_EXTERNAL_ID values.
+  # -------------------------------------------------------------------------
+  SnowflakeIntegrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: coco-workshop-snowflake-integration-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: coco-workshop-placeholder
+      Policies:
+        - PolicyName: coco-workshop-snowflake-integration-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3IcebergAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  - !GetAtt WorkshopBucket.Arn
+                  - !Sub '${WorkshopBucket.Arn}/*'
+              - Sid: GlueCatalogLinkedDatabase
+                Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetDatabases
+                  - glue:GetTable
+                  - glue:GetTables
+                  - glue:GetPartition
+                  - glue:GetPartitions
+                  - glue:BatchGetPartition
+                  - glue:SearchTables
+                Resource: '*'
+              - Sid: LakeFormationDataAccess
+                Effect: Allow
+                Action:
+                  - lakeformation:GetDataAccess
+                Resource: '*'
+      Tags:
+        - Key: Project
+          Value: coco-immersion-day
+
+  # -------------------------------------------------------------------------
+  # Glue Database — Iceberg catalog for Snowflake Catalog Linked Database
+  # -------------------------------------------------------------------------
+  WorkshopGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: coco_workshop
+        Description: >
+          CoCo Workshop Iceberg data catalog. Snowflake accesses this via a
+          Catalog Linked Database pointing to the AWS Glue Data Catalog.
+
+  # -------------------------------------------------------------------------
   # Security Group — EC2 jumphost (egress-only, SSM needs no inbound)
   # -------------------------------------------------------------------------
   EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: CoCo Workshop EC2 — egress only for SSM
+      GroupDescription: CoCo Workshop EC2 - egress only for SSM
       GroupName: coco-workshop-ec2-sg
+      VpcId: !Ref WorkshopVPC
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -165,6 +296,7 @@ Resources:
       IamInstanceProfile: !Ref EC2InstanceProfile
       SecurityGroupIds:
         - !Ref EC2SecurityGroup
+      SubnetId: !Ref PublicSubnet
       Tags:
         - Key: Name
           Value: coco-workshop-jumphost
@@ -192,19 +324,12 @@ Resources:
           # Clone workshop repo
           su - ec2-user -c 'git clone https://github.com/snowflake-labs/aws-immersion-day-cortex-code.git ~/workshop || true'
 
-          # Write Snowflake config
+          # Write Snowflake config (using printf to avoid heredoc indentation issues)
           mkdir -p /home/ec2-user/.snowflake
-          cat > /home/ec2-user/.snowflake/config.toml << 'SNOWCFG'
-          default_connection_name = "DEMO"
-
-          [connections.DEMO]
-          account = "${SnowflakeAccount}"
-          user = "${SnowflakeUser}"
-          password = "${SnowflakePAT}"
-          role = "${SnowflakeRole}"
-          warehouse = "${SnowflakeWarehouse}"
-          database = "${SnowflakeDatabase}"
-          SNOWCFG
+          printf 'default_connection_name = "DEMO"\n\n[connections.DEMO]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nrole = "%s"\nwarehouse = "%s"\ndatabase = "%s"\n' \
+            '${SnowflakeAccount}' '${SnowflakeUser}' '${SnowflakePAT}' \
+            '${SnowflakeRole}' '${SnowflakeWarehouse}' '${SnowflakeDatabase}' \
+            > /home/ec2-user/.snowflake/config.toml
 
           chmod 600 /home/ec2-user/.snowflake/config.toml
           chown -R ec2-user:ec2-user /home/ec2-user
@@ -284,6 +409,21 @@ Resources:
                   - quicksight:CreateIngestion
                   - quicksight:DescribeIngestion
                   - quicksight:ListIngestions
+                Resource: '*'
+              - Sid: GlueCatalogAccess
+                Effect: Allow
+                Action:
+                  - glue:GetDatabase
+                  - glue:GetDatabases
+                  - glue:GetTable
+                  - glue:GetTables
+                  - glue:GetPartition
+                  - glue:GetPartitions
+                  - glue:BatchGetPartition
+                  - glue:CreateTable
+                  - glue:UpdateTable
+                  - glue:BatchCreatePartition
+                  - lakeformation:GetDataAccess
                 Resource: '*'
       Tags:
         - Key: Project
@@ -449,10 +589,6 @@ Resources:
     Properties:
       GroupDescription: MWAA environment security group
       VpcId: !Ref WorkshopVPC
-      SecurityGroupIngress:
-        - IpProtocol: -1
-          SourceSecurityGroupId: !Ref MWAASecurityGroup
-          Description: Self-referencing rule for MWAA
       SecurityGroupEgress:
         - IpProtocol: -1
           CidrIp: 0.0.0.0/0
@@ -493,3 +629,13 @@ Outputs:
   SnowflakeAccountParam:
     Description: Snowflake account used for this workshop
     Value: !Ref SnowflakeAccount
+
+  SnowflakeIntegrationRoleARN:
+    Description: >
+      IAM role ARN for Snowflake storage integration and Catalog Linked Database.
+      Use this in CREATE STORAGE INTEGRATION and when setting up the Glue CLD in Snowflake.
+    Value: !GetAtt SnowflakeIntegrationRole.Arn
+
+  GlueDatabaseName:
+    Description: AWS Glue database name for the Snowflake Catalog Linked Database
+    Value: !Ref WorkshopGlueDatabase
