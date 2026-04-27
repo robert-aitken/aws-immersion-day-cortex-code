@@ -16,7 +16,7 @@ Build a Streamlit app that turns `COCO_WORKSHOP.MARTS` into a useful data produc
 
 **Baseline requirement (Bronze tier)**:
 
-- Runs locally on the EC2 jumphost (or Streamlit in Snowflake if you prefer)
+- Deployed as a **Streamlit in Snowflake (SiS)** app using the container runtime
 - At least 2 meaningful charts backed by `fct_orders` and/or `dim_customers`
 - At least 1 interactive filter (region, category, date range, customer segment, etc.)
 - One clearly labeled "insight" section — a narrative, a KPI summary, or a "what to do next" panel
@@ -37,29 +37,33 @@ Two people picking different personas will build very different apps on the same
 Pick one of these to give CoCo and then iterate. Don't just accept the first version — push it.
 
 ```
-Build a Streamlit app in ~/workshop/app/app.py that connects to Snowflake
-using connection DEMO and queries COCO_WORKSHOP.MARTS. The app should help
-a sales leader track revenue, top customers, and weak regions. Make it feel
-polished and presentation-ready, with a clear executive summary at the top.
+Build a Streamlit in Snowflake app that connects using connection DEMO and
+queries COCO_WORKSHOP.MARTS. The app should help a sales leader track revenue,
+top customers, and weak regions. Deploy it as a SiS app with the container
+runtime. Make it feel polished and presentation-ready, with a clear executive
+summary at the top.
 ```
 
 ```
-Build a Streamlit app aimed at an analyst who wants to find unusual trends
-in order volume, average order value, and product category performance.
-Include filters for region and category, and a section that calls out
-anomalies or outliers it finds in the data.
+Build a Streamlit in Snowflake app aimed at an analyst who wants to find
+unusual trends in order volume, average order value, and product category
+performance. Include filters for region and category, and a section that
+calls out anomalies or outliers it finds in the data. Deploy with the
+container runtime.
 ```
 
 ```
-Build a Streamlit app with an executive summary, interactive charts, and a
-section called "Where to act next". Infer useful opportunities from the
-data in COCO_WORKSHOP.MARTS and explain each recommendation in plain English.
+Build a Streamlit in Snowflake app with an executive summary, interactive
+charts, and a section called "Where to act next". Infer useful opportunities
+from the data in COCO_WORKSHOP.MARTS and explain each recommendation in
+plain English. Use the container runtime for deployment.
 ```
 
 ```
-Create a multi-page Streamlit app over COCO_WORKSHOP.MARTS with one page per
-persona: an executive overview, a regional deep dive, and a customer
-leaderboard. Add cross-page filters for date range and region.
+Create a multi-page Streamlit in Snowflake app over COCO_WORKSHOP.MARTS
+with one page per persona: an executive overview, a regional deep dive,
+and a customer leaderboard. Add cross-page filters for date range and
+region. Deploy with the container runtime.
 ```
 
 Then keep going. Ask CoCo to restyle it, add narrative copy, add drilldowns, add comparisons, add a sidebar nav. Small iterations produce much better apps than one giant prompt.
@@ -76,11 +80,57 @@ cortex -c DEMO
 Then hand it one of the prompts above and work with it. CoCo should:
 
 1. Read `AGENTS.md` and understand the workshop context
-2. Generate a `requirements.txt` or install into the existing environment
-3. Scaffold `app/app.py` (or similar) that uses `snowflake.connector` with connection `DEMO`
-4. Run the app and open it in a browser tab
+2. Scaffold a `snowflake.yml` + `app.py` (and optionally `requirements.txt`) for a SiS container-runtime app
+3. Deploy the app with `snow streamlit deploy -c DEMO --open`
+4. Iterate on the app code and redeploy with `snow streamlit deploy -c DEMO --replace`
 
-If you're running on the EC2 jumphost, you may need to either port-forward via Session Manager or run the app inside Streamlit in Snowflake. Ask CoCo for the simplest option in your environment.
+> ### Why Streamlit in Snowflake, not local?
+>
+> - **Zero networking setup** — no port-forwarding, no Session Manager tunnels, no firewall rules
+> - **Auth handled automatically** — the SiS app runs with the same role and warehouse as your connection
+> - **Same place the data lives** — queries stay inside Snowflake, no data leaves the account
+> - **Easy to share** — send the instructor a link for judging instead of screen-sharing an EC2 terminal
+
+> [!IMPORTANT]
+> ### Container runtime required
+>
+> When your SiS app is created, make sure CoCo selects the **container runtime** (SPCS-backed), **NOT** the legacy warehouse runtime. The warehouse runtime has a locked, curated Anaconda channel and will fail with `ModuleNotFoundError` on anything outside that set. The container runtime reads `requirements.txt` / `pyproject.toml` directly and can install packages from PyPI.
+>
+> If you get a package error, this is almost certainly why. Check your `snowflake.yml` — it should include `runtime_name` and `compute_pool` fields.
+
+Here is the `snowflake.yml` pattern your project should use:
+
+```yaml
+definition_version: 2
+entities:
+  workshop_app:
+    type: streamlit
+    identifier: coco_workshop_app
+    query_warehouse: COCO_WORKSHOP_WH
+    compute_pool: COCO_WORKSHOP_COMPUTE_POOL
+    runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11
+    main_file: app.py
+    artifacts:
+      - app.py
+      - requirements.txt
+```
+
+Key things to note:
+- `runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11` — this is what selects the container runtime
+- `compute_pool` — required for the container runtime; use the pool your instructor provisioned (check with `SHOW COMPUTE POOLS`)
+- `artifacts` — list every file your app needs (pages, data files, etc.)
+
+Deploy with:
+
+```bash
+snow streamlit deploy -c DEMO --open
+```
+
+Redeploy after edits:
+
+```bash
+snow streamlit deploy -c DEMO --replace
+```
 
 ## Judging Rubric
 
@@ -93,6 +143,36 @@ The winning app will score well across all five dimensions, not just one:
 | **Creativity** | Is it more than a default dashboard? Did you pick a persona and commit to it? |
 | **Interaction** | Filters, drilldowns, comparisons, or a chat interface — not just static charts |
 | **Finish** | Does it feel complete? Clean layout, sensible defaults, helpful copy |
+
+## The Bounty Hunt
+
+There are 5 deliberately planted insights hiding in the dataset. Each one is a clear, unambiguous business finding that is invisible from a raw `SELECT *` but obvious from the right chart or aggregate.
+
+**Find them to level up your recognition:**
+
+- Find 3 → eligible for **Silver** recognition
+- Find 4 → eligible for **Gold** recognition
+- Find 5 → eligible for **Platinum** recognition
+
+Here are the five eggs. The names are evocative, the hints are cryptic. The answers are NOT here — you have to find them.
+
+| # | Name | Hint |
+|---|---|---|
+| 1 | **The Category Collapse** | Something bad happened mid-2025. A whole product category never recovered. Which one, and when? |
+| 2 | **The Silent Star** | One of our four regions looks tiny at first glance. But look closer at growth and order value. The future is not where the revenue is today. |
+| 3 | **The VIP Whale Curve** | The revenue distribution is not 80/20. It is much more top-heavy than that. How much of the business really rides on a handful of accounts? |
+| 4 | **The Pricing Bug** | A single product has quiet inconsistencies between what we charged per line and what the math says we should have charged. Which product, how often, and how much have we lost? |
+| 5 | **The Fraud Cluster** | A small group of customers is responsible for a surprisingly large share of revenue. On closer inspection, their behaviour is... unusual. How many are there, where are they, and how much of our "revenue" might actually be at risk of chargeback? |
+
+**How to hunt:**
+
+- Build charts in your Streamlit app that slice and dice by category, region, customer, and product
+- Use Cortex Analyst chat (Gold tier) to ask natural-language questions against the data
+- Use Snowflake ML anomaly detection (Platinum tier) to surface statistical outliers — Egg 5 is particularly well-suited to this approach
+- Compare line-item math against order totals to catch discrepancies (Egg 4)
+- Look at distributions, not just averages — the interesting stuff hides in the tails
+
+No answers are provided in this lab. Finding them is the challenge.
 
 ## Bonus Tiers
 
@@ -172,8 +252,9 @@ When time is called:
 
 ## What You've Learned
 
-- How to go from a clean marts layer to a user-facing data product using CoCo
+- How to deploy a Streamlit in Snowflake app from CoCo using the container runtime
 - How small prompt iterations produce dramatically better apps than one big prompt
 - How to layer a semantic view and natural-language chat on top of existing marts
 - How to call Snowflake-native ML functions from SQL to add forecasting or anomaly detection
 - Why picking a persona first makes the final app much more useful than "build a dashboard"
+- How to find non-obvious business insights by combining the right charts, aggregations, and ML techniques

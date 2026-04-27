@@ -65,7 +65,7 @@ Run these only if you intend to include Lab 04 (MWAA orchestration). Lab 03 (the
 1. Verify the MWAA environment imports the DAG without provider or package errors.
 2. Verify MWAA workers have access to `snow`, `dbt`, the dbt project, and Snowflake credentials.
 3. Verify every Airflow Variable referenced by `dags/ecommerce_pipeline.py` is present.
-4. Trigger the DAG once and confirm `load_seed_data`, `dbt_run`, and `dbt_test` succeed without worker-side surgery. (Any legacy `refresh_quicksight` task should be removed or ignored — QuickSight is no longer part of the workshop.)
+4. Trigger the DAG once and confirm `load_seed_data`, `dbt_run`, and `dbt_test` succeed without worker-side surgery.
 
 ## Failure Checklist
 

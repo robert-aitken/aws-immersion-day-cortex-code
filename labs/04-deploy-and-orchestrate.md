@@ -130,7 +130,7 @@ Expected high-risk failure modes in unprepared environments:
 - missing Snowflake config or password on the MWAA worker
 - missing Airflow Variables
 
-> **Note**: the DAG source in this repo may still contain an optional `refresh_quicksight` task. It is not part of the supported workshop path and should either be removed from the DAG or ignored. Participant-facing success for this lab ends at `dbt_test`.
+Success for this lab ends at `dbt_test`. The DAG is a 3-task pipeline.
 
 ## Step 6: Verify in Snowflake
 

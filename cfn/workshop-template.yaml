@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   CoCo Workshop — AI-Accelerated Data Engineering with Snowflake + AWS.
-  Provisions: EC2 jumphost, Amazon MWAA, S3, IAM roles, and QuickSight dataset.
+  Provisions: EC2 jumphost, Amazon MWAA, S3, and IAM roles.
 
 # ===========================================================================
 # Parameters
@@ -76,7 +76,7 @@ Resources:
           Value: coco-immersion-day
 
   # -------------------------------------------------------------------------
-  # IAM Role — EC2 jumphost (SSM, S3, MWAA, QuickSight)
+  # IAM Role — EC2 jumphost (SSM, S3, MWAA)
   # -------------------------------------------------------------------------
   EC2Role:
     Type: AWS::IAM::Role
@@ -115,15 +115,6 @@ Resources:
                   - airflow:CreateWebLoginToken
                   - airflow:InvokeRestApi
                 Resource: !Sub 'arn:aws:airflow:${AWS::Region}:${AWS::AccountId}:environment/coco-workshop-mwaa'
-              - Sid: QuickSightAccess
-                Effect: Allow
-                Action:
-                  - quicksight:CreateIngestion
-                  - quicksight:DescribeIngestion
-                  - quicksight:ListIngestions
-                  - quicksight:ListDataSets
-                  - quicksight:DescribeDataSet
-                Resource: '*'
               - Sid: GlueReadAccess
                 Effect: Allow
                 Action:
@@ -422,13 +413,6 @@ Resources:
                 Condition:
                   StringLike:
                     kms:ViaService: !Sub 'sqs.${AWS::Region}.amazonaws.com'
-              - Sid: QuickSightRefresh
-                Effect: Allow
-                Action:
-                  - quicksight:CreateIngestion
-                  - quicksight:DescribeIngestion
-                  - quicksight:ListIngestions
-                Resource: '*'
               - Sid: GlueCatalogAccess
                 Effect: Allow
                 Action:

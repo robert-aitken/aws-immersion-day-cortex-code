@@ -5,7 +5,6 @@ Orchestrates the full e-commerce data pipeline:
   1. Load seed data from S3 Parquet files into Snowflake source tables
   2. Run dbt models (staging + marts)
   3. Run dbt tests
-  4. Refresh the QuickSight SPICE dataset
 
 Deployed to MWAA via S3: s3://<workshop-bucket>/dags/ecommerce_pipeline.py
 """
@@ -16,9 +15,6 @@ import json
 import boto3
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.providers.amazon.aws.operators.quicksight import (
-    QuickSightCreateIngestionOperator,
-)
 from airflow.models import Variable
 
 # ---------------------------------------------------------------------------
@@ -31,7 +27,6 @@ SNOWFLAKE_WAREHOUSE = Variable.get("snowflake_warehouse", default_var="COCO_WORK
 SNOWFLAKE_ROLE = Variable.get("snowflake_role", default_var="COCO_WORKSHOP_ROLE")
 WORKSHOP_BUCKET = Variable.get("workshop_bucket", default_var="coco-workshop-bucket")
 AWS_ACCOUNT_ID = Variable.get("aws_account_id", default_var="000000000000")
-QS_DATASET_ID = Variable.get("quicksight_dataset_id", default_var="coco-workshop-dataset")
 AWS_REGION = Variable.get("aws_region", default_var="us-west-2")
 PUBLIC_SEED_BUCKET = Variable.get("public_seed_bucket", default_var="aws-immersion-day-cortex-code-public")
 SNOWFLAKE_SECRET_ID = Variable.get(
@@ -120,11 +115,11 @@ default_args = {
 with DAG(
     dag_id="ecommerce_pipeline",
     default_args=default_args,
-    description="CoCo Workshop: E-commerce pipeline with dbt + QuickSight refresh",
+    description="CoCo Workshop: E-commerce pipeline with dbt",
     schedule_interval=None,  # Manually triggered
     start_date=datetime(2026, 1, 1),
     catchup=False,
-    tags=["coco-workshop", "dbt", "quicksight"],
+    tags=["coco-workshop", "dbt"],
 ) as dag:
 
     # Task 1: Load seed data from S3 into Snowflake
@@ -168,17 +163,5 @@ with DAG(
         """,
     )
 
-    # Task 4: Refresh QuickSight SPICE dataset
-    refresh_quicksight = QuickSightCreateIngestionOperator(
-        task_id="refresh_quicksight",
-        data_set_id=QS_DATASET_ID,
-        ingestion_id="{{ ts_nodash }}-coco-workshop",
-        ingestion_type="FULL_REFRESH",
-        wait_for_completion=True,
-        check_interval=15,
-        aws_conn_id="aws_default",
-        region=AWS_REGION,
-    )
-
     # Task dependencies
-    load_seed_data >> dbt_run >> dbt_test >> refresh_quicksight
+    load_seed_data >> dbt_run >> dbt_test

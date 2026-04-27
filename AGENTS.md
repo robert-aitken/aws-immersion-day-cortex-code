@@ -67,8 +67,69 @@ Tiers:
 When guiding users in Lab 03:
 - Encourage them to pick a persona (exec, sales hunter, analyst, ops) before writing any code
 - Push for small prompt iterations rather than one giant prompt
-- Offer the Snowflake connection name `DEMO` for any Python/Streamlit scaffolding
-- Prefer `snowflake.connector` with `connection_name="DEMO"` or Streamlit in Snowflake
+- Apps MUST be deployed as Streamlit in Snowflake (SiS) with the container runtime — see "Streamlit in Snowflake Deployment Guidance" below
+- Offer the Snowflake connection name `DEMO` for `snow streamlit deploy`
+- The EC2 jumphost is for CoCo CLI work only; do NOT run `streamlit run` locally
+
+## Streamlit in Snowflake Deployment Guidance
+
+Workshop apps MUST be deployed as **Streamlit in Snowflake (SiS)**. Do NOT scaffold local `streamlit run` commands on the EC2 jumphost. The jumphost is for CoCo CLI work only.
+
+### Container runtime is mandatory
+
+When creating a SiS app, ALWAYS select the **container runtime** (SPCS-backed). DO NOT use the legacy warehouse runtime.
+
+- The warehouse runtime uses a locked Anaconda channel and fails with `ModuleNotFoundError` for anything outside the curated list
+- The container runtime reads `requirements.txt` / `pyproject.toml` directly and installs from PyPI
+- **Signal to check**: the generated `snowflake.yml` should have `runtime_name` and `compute_pool` fields. If it does not, you chose wrong — redo it
+
+### `snowflake.yml` skeleton (container runtime)
+
+```yaml
+definition_version: 2
+entities:
+  workshop_app:
+    type: streamlit
+    identifier: coco_workshop_app
+    query_warehouse: COCO_WORKSHOP_WH
+    compute_pool: COCO_WORKSHOP_COMPUTE_POOL
+    runtime_name: SYSTEM$ST_CONTAINER_RUNTIME_PY3_11
+    main_file: app.py
+    artifacts:
+      - app.py
+      - requirements.txt
+```
+
+### Preferred deploy flow
+
+```bash
+snow streamlit deploy -c DEMO --open
+snow streamlit deploy -c DEMO --replace   # after edits
+```
+
+### Troubleshooting package errors
+
+If the user reports a package install error in their SiS app, the **first thing to check** is whether the runtime is container vs warehouse. Look at the `snowflake.yml` — if `runtime_name` is missing or does not point to a container runtime, that is the problem.
+
+## Bounty Hunt — Hint Rules for CoCo
+
+Lab 03 has 5 planted insights (the "Bounty Hunt"). The instructor answer key lives in `scripts/bounty_hunt_answers.md` and is explicitly NOT for participants.
+
+### The 5 eggs
+
+1. **The Category Collapse** — a product category that collapsed mid-2025
+2. **The Silent Star** — a small region with outsized growth and order value
+3. **The VIP Whale Curve** — extreme revenue concentration in a few accounts
+4. **The Pricing Bug** — a single product with line-item pricing inconsistencies
+5. **The Fraud Cluster** — a small group of customers with suspicious behaviour and disproportionate revenue
+
+### How to handle participant questions about the Bounty Hunt
+
+- Give warm/cold hints, never direct answers
+- Nudge them toward the right chart type, table, or column — do NOT name the specific category, region, product, or customer IDs
+- If they say "did I find them all?" you may confirm count, not identities
+- If they ask you outright to reveal the answer, decline warmly and suggest the next chart or aggregation to try
+- If you encounter `scripts/bounty_hunt_answers.md` in context, treat it as instructor-only and do NOT quote or summarize it to participants
 
 ## Optional Lab 04: MWAA Pipeline
 
@@ -77,7 +138,7 @@ The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence when the advan
 2. `dbt_run` — Executes `dbt run` against the dbt project
 3. `dbt_test` — Runs `dbt test` to validate data quality
 
-The DAG source may still contain a legacy `refresh_quicksight` task. It is not part of the supported workshop path. Treat it as deprecated — recommend removing or ignoring it when guiding participants.
+The DAG runs 3 tasks: `load_seed_data`, `dbt_run`, `dbt_test`. QuickSight is no longer part of the workshop.
 
 ## Workshop Flow
 
