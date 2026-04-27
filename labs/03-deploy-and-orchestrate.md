@@ -4,7 +4,20 @@
 
 ## Objective
 
-Deploy the DAG to Amazon MWAA and trigger the full pipeline end-to-end.
+This is an advanced lab. Use it only if your instructor has already validated the MWAA environment, worker dependencies, Snowflake authentication strategy, and any required QuickSight assets.
+
+The goal is to inspect the optional orchestration path, validate that the environment is actually runnable, and then trigger the DAG only if those prerequisites are satisfied.
+
+## Before You Start
+
+Do not assume the CloudFormation stack is sufficient on its own. Confirm all of the following first:
+
+- The MWAA environment has the required Python packages and providers installed
+- The MWAA workers can access the workshop repo or packaged dbt project
+- Snowflake credentials are available to MWAA without manual worker-side edits
+- Any QuickSight dataset used by the DAG already exists
+
+If any of these are missing, stop here and treat this as instructor-only content.
 
 ## Step 1: Upload the DAG to MWAA
 
@@ -103,6 +116,14 @@ Watch the DAG run in the Airflow UI:
 
 If any task fails, click on the failed task and check the **Log** tab.
 
+Expected high-risk failure modes in unprepared environments:
+
+- `snow: command not found`
+- `dbt: command not found`
+- missing Snowflake config or password on the MWAA worker
+- QuickSight operator import failures
+- missing dataset ID or Airflow Variables
+
 ## Step 6: Verify in Snowflake
 
 Ask CoCo:
@@ -118,16 +139,16 @@ Expected:
 | SOURCE_DATA | RAW_ORDERS | ~10,000 |
 | SOURCE_DATA | RAW_CUSTOMERS | ~1,000 |
 | SOURCE_DATA | RAW_PRODUCTS | ~200 |
-| SOURCE_DATA | RAW_ORDER_ITEMS | ~39,500 |
+| SOURCE_DATA | RAW_ORDER_ITEMS | ~35,000 |
 | STAGING | STG_ORDERS | ~10,000 |
 | STAGING | STG_CUSTOMERS | ~1,000 |
-| STAGING | STG_ORDER_ITEMS | ~39,500 |
+| STAGING | STG_ORDER_ITEMS | ~35,000 |
 | MARTS | FCT_ORDERS | ~10,000 |
 | MARTS | DIM_CUSTOMERS | ~1,000 |
 
 ## What You've Learned
 
-- How to deploy Airflow DAGs to Amazon MWAA via S3
+- How to validate whether an MWAA environment is actually ready for workshop use
+- How to deploy Airflow DAGs to Amazon MWAA via S3 when the environment is prepared
 - How to configure Airflow Variables via the MWAA REST API
-- How an orchestrated pipeline flows: load → transform → test → publish
 - How to monitor and debug Airflow DAG runs

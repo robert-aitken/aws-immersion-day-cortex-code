@@ -41,20 +41,15 @@ su - ec2-user -c 'git clone https://github.com/snowflake-labs/aws-immersion-day-
 
 # -------------------------------------------------------
 # 6. Write Snowflake config.toml
-#    Values are injected by CloudFormation parameters.
+#    When run via CloudFormation UserData, Fn::Sub replaces the
+#    ${Param} placeholders before this script executes.
+#    When run standalone, set these environment variables first:
+#      export SnowflakeAccount=... SnowflakeUser=... SnowflakePAT=...
 # -------------------------------------------------------
 mkdir -p /home/ec2-user/.snowflake
-cat > /home/ec2-user/.snowflake/config.toml << 'SNOWCFG'
-default_connection_name = "DEMO"
-
-[connections.DEMO]
-account = "${SnowflakeAccount}"
-user = "${SnowflakeUser}"
-password = "${SnowflakePAT}"
-role = "COCO_WORKSHOP_ROLE"
-warehouse = "COCO_WORKSHOP_WH"
-database = "COCO_WORKSHOP"
-SNOWCFG
+printf 'default_connection_name = "DEMO"\n\n[connections.DEMO]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nrole = "COCO_WORKSHOP_ROLE"\nwarehouse = "COCO_WORKSHOP_WH"\ndatabase = "COCO_WORKSHOP"\n' \
+  "${SnowflakeAccount}" "${SnowflakeUser}" "${SnowflakePAT}" \
+  > /home/ec2-user/.snowflake/config.toml
 
 chmod 600 /home/ec2-user/.snowflake/config.toml
 chown -R ec2-user:ec2-user /home/ec2-user

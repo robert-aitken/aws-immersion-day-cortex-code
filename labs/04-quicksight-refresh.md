@@ -4,6 +4,8 @@
 
 ## Objective
 
+This is an advanced lab. Use it only if an instructor has already confirmed that QuickSight is enabled in the workshop account and that the dataset referenced by the orchestration flow already exists.
+
 Verify the QuickSight SPICE dataset was refreshed by the pipeline, then build a simple dashboard.
 
 ## Step 1: Check the SPICE Refresh
@@ -24,7 +26,7 @@ Look for an ingestion with status `COMPLETED`.
 ## Step 2: Open QuickSight
 
 1. Navigate to **Amazon QuickSight** in the AWS Console
-2. If prompted, sign up for QuickSight Enterprise (it's included in the workshop account)
+2. You should not need to self-register QuickSight during the workshop. If you are prompted to sign up, stop and ask an instructor to confirm the account setup.
 3. Go to **Datasets** — you should see the `coco-workshop-dataset` with recent data
 
 ## Step 3: Create a New Analysis
@@ -84,7 +86,7 @@ This makes the data queryable via natural language through Cortex Analyst.
 
 - How MWAA orchestration connects to QuickSight via the SPICE refresh API
 - How to build basic QuickSight dashboards from Snowflake data
-- The full end-to-end story: raw data → dbt → Airflow → QuickSight
+- The optional end-to-end extension: raw data -> dbt -> Airflow -> QuickSight
 - How CoCo can provide SQL-based analytics alongside BI dashboards
 
 ## End-to-End Architecture (Completed)
@@ -105,4 +107,4 @@ seed data   ──→  SOURCE_DATA (raw tables)    ──→  MWAA triggers
                                                    Dashboard
 ```
 
-Congratulations — you've built a complete, AI-accelerated data engineering pipeline.
+If this lab worked in your environment, you validated the optional QuickSight extension on top of the core workshop path.

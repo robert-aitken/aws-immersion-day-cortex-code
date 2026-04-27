@@ -4,7 +4,8 @@
 
 ## Objective
 
-Verify your EC2 jumphost is ready and all tools are working.
+Verify your EC2 jumphost is ready, confirm the workshop CLIs are already installed,
+and make sure the Snowflake connection is working before you begin the core labs.
 
 ## Step 1: Connect to Your EC2 Jumphost
 
@@ -19,66 +20,52 @@ Switch to the workshop user:
 sudo su - ec2-user
 ```
 
-## Step 2: Verify CoCo CLI
+## Step 2: Verify CLIs
 
 ```bash
-cortex --version
+export PATH=$HOME/.local/bin:$PATH
+cortex --version      # Expect: Cortex Code v1.x
+snow --version        # Expect: Snowflake CLI x.x.x
+aws sts get-caller-identity   # Expect: your workshop account ID
 ```
 
-Expected output:
-```
-Cortex Code v1.0.x
-```
+If either CLI is missing, stop and ask an instructor to fix the bootstrap. The paved-road workshop assumes the EC2 jumphost is already prepared.
 
-## Step 3: Verify Snowflake CLI
-
-```bash
-snow --version
-```
-
-Expected output:
-```
-Snowflake CLI version: x.x.x
-```
-
-## Step 4: Test Snowflake Connectivity
+## Step 3: Test Snowflake Connectivity
 
 ```bash
 snow sql -c DEMO -q "SELECT CURRENT_ACCOUNT(), CURRENT_USER(), CURRENT_ROLE()"
 ```
 
-You should see your workshop account, user, and `COCO_WORKSHOP_ROLE`.
+You should see your workshop account, user, and role.
 
-## Step 5: Verify AWS CLI
-
-```bash
-aws sts get-caller-identity
-```
-
-You should see your workshop AWS account ID.
-
-## Step 6: Check the Workshop Repo
+## Step 4: Check the Workshop Repo
 
 ```bash
 ls ~/workshop/
 ```
 
-You should see: `AGENTS.md`, `README.md`, `cfn/`, `dags/`, `dbt_project/`, `data/`, `labs/`, `scripts/`
+Expected contents: `AGENTS.md`, `cfn/`, `dags/`, `dbt_project/`, `data/`, `labs/`, `scripts/`
+
+## What Happens Next
+
+Lab 01 handles the Snowflake setup and seed-data load in one guided flow. In this pre-work lab, the goal is only to confirm the environment is ready for that step.
 
 ## Pre-Work Checklist
 
 - [ ] Session Manager connects to EC2 jumphost
 - [ ] `cortex --version` works
 - [ ] `snow --version` works
-- [ ] Snowflake query returns account info
 - [ ] `aws sts get-caller-identity` works
 - [ ] Workshop repo is present at `~/workshop/`
+- [ ] `snow sql -c DEMO -q "SELECT CURRENT_ACCOUNT(), CURRENT_USER(), CURRENT_ROLE()"` works
 
 ## Troubleshooting
 
 | Issue | Fix |
 |---|---|
-| `cortex: command not found` | Run `export PATH=$HOME/.local/bin:$PATH` and retry |
+| `cortex: command not found` | The EC2 bootstrap is incomplete. Ask an instructor to repair the jumphost before continuing. |
+| `snow: command not found` | The EC2 bootstrap is incomplete. Ask an instructor to repair the jumphost before continuing. |
 | Snowflake connection error | Check `~/.snowflake/config.toml` exists and has correct credentials |
 | Session Manager can't find instance | Wait 2-3 minutes for SSM agent to register, then refresh |
 

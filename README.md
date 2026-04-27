@@ -2,7 +2,18 @@
 
 **Hands-On with Cortex Code CLI**
 
-An AWS Immersion Day workshop that teaches data engineers how to build, debug, and orchestrate end-to-end data pipelines using Snowflake's Cortex Code (CoCo) CLI alongside core AWS services.
+An AWS Immersion Day workshop that teaches data engineers how to use Snowflake's Cortex Code (CoCo) CLI to inspect data, run setup tasks, debug a dbt project, and validate a simple AWS-backed workshop environment.
+
+## Recommended Scope
+
+The novice-safe path in this repo is:
+
+1. Connect to the EC2 jumphost and verify `cortex`, `snow`, and `aws`
+2. Run Snowflake setup and load the seed data
+3. Use CoCo to explore the repository, schemas, and lineage
+4. Reproduce and fix the planted dbt bug, then rerun the project
+
+Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced or instructor-led extensions. They are not part of the guaranteed completion path for every participant.
 
 ## Architecture
 
@@ -45,10 +56,10 @@ An AWS Immersion Day workshop that teaches data engineers how to build, debug, a
 
 ## What You'll Build
 
-1. **Explore source data** with CoCo CLI — ask natural-language questions about your Snowflake schemas
-2. **Debug a broken dbt pipeline** — the mart layer has a planted column-name bug that CoCo helps you find and fix
-3. **Deploy and orchestrate** via Amazon MWAA — an Airflow DAG runs the full dbt build and validates results
-4. **Trigger a QuickSight SPICE refresh** — the final DAG task refreshes an Amazon QuickSight dataset so dashboards reflect the latest data
+1. **Explore source data** with CoCo CLI and inspect the Snowflake schemas created for the workshop
+2. **Understand model dependencies** across the dbt project and trace lineage from source to marts
+3. **Debug a broken dbt pipeline** by finding and fixing the planted column-name bug in the mart layer
+4. **Validate the workshop environment** so you can continue into advanced AWS orchestration labs if your sandbox is prepared for them
 
 ## Prerequisites
 
@@ -64,11 +75,11 @@ No local software installation is required. All CLI work happens on a pre-provis
 
 ### Instructor-Led (Recommended)
 
-Deploy the CloudFormation template via AWS Workshop Studio. Each participant receives:
+Deploy the CloudFormation template via AWS Workshop Studio. Each participant should receive:
 - An EC2 jumphost with CoCo CLI and Snowflake CLI pre-installed
-- An MWAA environment with the pipeline DAG deployed
-- A QuickSight SPICE dataset connected to Snowflake
 - Snowflake credentials (account, user, PAT) for their demo account
+
+`MWAA`, `QuickSight`, and `Iceberg/Glue` resources are best treated as advanced extensions unless you have separately validated that the sandbox account includes the required runtime packages, credentials, and datasets.
 
 ```bash
 aws cloudformation deploy \
@@ -100,9 +111,9 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
 ├── AGENTS.md                    # CoCo context (read automatically by CoCo CLI)
 ├── README.md                    # This file
 ├── cfn/
-│   └── workshop-template.yaml   # CloudFormation: EC2, MWAA, S3, IAM, QuickSight
+│   └── workshop-template.yaml   # CloudFormation: EC2 plus optional AWS extension resources
 ├── dags/
-│   └── ecommerce_pipeline.py    # Airflow DAG: dbt build -> QuickSight refresh
+│   └── ecommerce_pipeline.py    # Optional MWAA DAG for advanced orchestration labs
 ├── dbt_project/
 │   ├── dbt_project.yml
 │   ├── profiles.yml
@@ -119,18 +130,32 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
 │   ├── 03-deploy-and-orchestrate.md
 │   └── 04-quicksight-refresh.md
 └── scripts/
-    └── bootstrap-ec2.sh         # EC2 UserData script (tested on Amazon Linux 2023)
+    ├── bootstrap-ec2.sh         # EC2 UserData script (tested on Amazon Linux 2023)
+    ├── load-seed-data.sh        # Upload local Parquet seed files into Snowflake
+    └── snowflake-setup.sql      # Create the workshop Snowflake objects
 ```
 
 ## Labs Overview
 
 | Lab | Title | What You'll Do |
 |---|---|---|
-| 00 | Pre-Work | Connect to EC2, verify CoCo + Snowflake CLI |
-| 01 | Explore and Setup | Load seed data, explore schemas with CoCo |
+| 00 | Pre-Work | Connect to EC2, verify the workshop CLIs, and confirm the repo is present |
+| 01 | Explore and Setup | Run Snowflake setup, load seed data, and inspect the source schemas |
 | 02 | Fix the Pipeline | Find and fix the dbt bug using CoCo's debugging skills |
-| 03 | Deploy and Orchestrate | Trigger the MWAA DAG, watch the pipeline run end-to-end |
-| 04 | QuickSight Refresh | Verify SPICE refresh, build a simple dashboard |
+| 03 | Deploy and Orchestrate | Advanced lab: validate MWAA assumptions before attempting orchestration |
+| 04 | QuickSight Refresh | Advanced lab: verify a pre-created dataset and optional dashboard flow |
+
+## Instructor Validation
+
+Before the workshop, validate the paved-road flow on a fresh EC2 host and a fresh Snowflake account:
+
+1. `scripts/bootstrap-ec2.sh` leaves `cortex`, `snow`, and `aws` available to `ec2-user`
+2. `snow sql -c DEMO -q "SELECT CURRENT_ACCOUNT(), CURRENT_USER(), CURRENT_ROLE()"` succeeds without manual config edits
+3. `snow sql -c DEMO -f scripts/snowflake-setup.sql` completes successfully
+4. `./scripts/load-seed-data.sh` loads the expected row counts consistently
+5. The dbt lab fails first on the planted bug, then succeeds after the single intended fix
+
+If you plan to run Labs 03 or 04, also validate MWAA worker dependencies, Snowflake auth on MWAA, and the QuickSight dataset before participants arrive.
 
 ## Dataset
 

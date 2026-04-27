@@ -1,13 +1,15 @@
 # AWS Immersion Day: AI-Accelerated Data Engineering
 
-You are helping a workshop participant build and debug an e-commerce data pipeline
-on Snowflake, orchestrated by Amazon MWAA (Airflow), with a QuickSight dashboard
-as the final output.
+You are helping a workshop participant through a novice-safe workshop path focused on
+Snowflake setup, seed-data loading, repository exploration, and debugging a dbt project.
+
+Amazon MWAA, QuickSight, and Iceberg/Glue content exist in this repo as advanced or
+instructor-led extensions and should not be treated as guaranteed participant outcomes.
 
 ## Repository Layout
 
-- `cfn/workshop-template.yaml` — CloudFormation template that provisions EC2, MWAA, S3, IAM, QuickSight
-- `dags/ecommerce_pipeline.py` — Airflow DAG with tasks: load seed data, dbt run, dbt test, QuickSight refresh
+- `cfn/workshop-template.yaml` — CloudFormation template for the EC2 core path plus optional AWS extension resources
+- `dags/ecommerce_pipeline.py` — Optional Airflow DAG for advanced MWAA orchestration labs
 - `dbt_project/` — dbt project with staging + mart models (NOTE: there is a deliberate bug in `models/marts/fct_orders.sql`)
 - `data/seed/` — Parquet files with e-commerce sample data (~10K orders, 1K customers, 200 products, 35K line items)
 - `labs/` — Step-by-step lab instructions (00 through 04)
@@ -46,13 +48,13 @@ as the final output.
 In `dbt_project/models/marts/fct_orders.sql`, the final SELECT references `order_totals.TOTAL_AMOUNT` but the CTE column is actually named `ORDER_TOTAL`. This causes:
 1. A dbt compilation/run error on the fct_orders model
 2. A cascade failure on dim_customers (which depends on fct_orders)
-3. The MWAA DAG fails at the `dbt_run` task
+3. Any optional MWAA DAG that runs the same project can also fail at the `dbt_run` task
 
 The fix is to change `TOTAL_AMOUNT` to `ORDER_TOTAL` in fct_orders.sql.
 
-## MWAA Pipeline
+## Optional MWAA Pipeline
 
-The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence:
+The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence when the advanced environment is fully prepared:
 1. `load_seed_data` — Copies Parquet files from S3 to Snowflake source tables
 2. `dbt_run` — Executes `dbt run` against the dbt project
 3. `dbt_test` — Runs `dbt test` to validate data quality
@@ -61,16 +63,16 @@ The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence:
 ## Workshop Flow
 
 Participants should work through the labs in order:
-1. **Lab 00**: Verify environment (EC2, CoCo, Snowflake connectivity)
-2. **Lab 01**: Explore source data and understand the pipeline architecture
-3. **Lab 02**: Trigger the pipeline, observe the failure, use CoCo to debug and fix
-4. **Lab 03**: Re-run the pipeline successfully, verify mart tables
-5. **Lab 04**: Confirm QuickSight SPICE refresh and build a simple dashboard
+1. **Lab 00**: Verify environment readiness on the EC2 jumphost
+2. **Lab 01**: Run Snowflake setup, load seed data, and explore the project
+3. **Lab 02**: Trigger the dbt failure, investigate it, and apply the fix
+4. **Lab 03**: Optional advanced lab for MWAA validation and orchestration
+5. **Lab 04**: Optional advanced lab for QuickSight dataset refresh and dashboards
+6. **Lab 05**: Instructor validation runbook
 
 ## Key CoCo Skills Used
 
 - `analyzing-data` — Querying and exploring Snowflake tables
-- `dbt-projects-on-snowflake` — Working with dbt projects deployed to Snowflake
 - `lineage` — Tracing data dependencies to understand the bug's impact
 - `dynamic-tables` — Optional: creating Dynamic Tables for real-time aggregation
 - `dashboard` — Optional: building Snowflake-native dashboards
