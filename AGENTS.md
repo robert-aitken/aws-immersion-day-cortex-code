@@ -1,10 +1,12 @@
 # AWS Immersion Day: AI-Accelerated Data Engineering
 
-You are helping a workshop participant through a novice-safe workshop path focused on
-Snowflake setup, seed-data loading, repository exploration, and debugging a dbt project.
+You are helping a workshop participant through a core workshop path focused on
+Snowflake setup, seed-data loading, repository exploration, debugging a dbt
+project, and building a Streamlit data product on top of the clean marts layer.
 
-Amazon MWAA, QuickSight, and Iceberg/Glue content exist in this repo as advanced or
-instructor-led extensions and should not be treated as guaranteed participant outcomes.
+Amazon MWAA and Iceberg/Glue content exist in this repo as advanced or
+instructor-led extensions and should not be treated as guaranteed participant
+outcomes. QuickSight has been removed from the participant journey.
 
 ## Repository Layout
 
@@ -12,7 +14,7 @@ instructor-led extensions and should not be treated as guaranteed participant ou
 - `dags/ecommerce_pipeline.py` — Optional Airflow DAG for advanced MWAA orchestration labs
 - `dbt_project/` — dbt project with staging + mart models (NOTE: there is a deliberate bug in `models/marts/fct_orders.sql`)
 - `data/seed/` — Parquet files with e-commerce sample data (~10K orders, 1K customers, 200 products, 35K line items)
-- `labs/` — Step-by-step lab instructions (00 through 04)
+- `labs/` — Step-by-step lab instructions (00 through 05)
 - `scripts/bootstrap-ec2.sh` — EC2 UserData bootstrap script
 
 ## Snowflake Environment
@@ -48,17 +50,34 @@ instructor-led extensions and should not be treated as guaranteed participant ou
 In `dbt_project/models/marts/fct_orders.sql`, the final SELECT references `order_totals.TOTAL_AMOUNT` but the CTE column is actually named `ORDER_TOTAL`. This causes:
 1. A dbt compilation/run error on the fct_orders model
 2. A cascade failure on dim_customers (which depends on fct_orders)
-3. Any optional MWAA DAG that runs the same project can also fail at the `dbt_run` task
+3. Anything downstream of the marts (a Streamlit app, a semantic view, an optional MWAA DAG run) breaks for the same reason
 
 The fix is to change `TOTAL_AMOUNT` to `ORDER_TOTAL` in fct_orders.sql.
 
-## Optional MWAA Pipeline
+## Lab 03: From Pipeline to Product (Core App Challenge)
+
+After the dbt fix, Lab 03 is a creative build challenge, not a walkthrough. Participants use CoCo to build a Streamlit app on top of `COCO_WORKSHOP.MARTS`. It is scored on clarity, usefulness, creativity, interaction, and finish.
+
+Tiers:
+- **Bronze**: 2+ charts, at least one filter, one "insight" section over the marts layer
+- **Silver**: polished version of Bronze with drilldowns, comparisons, narrative copy, consistent styling
+- **Gold**: add a Snowflake semantic view over the marts and a Cortex Analyst chat panel inside the app
+- **Platinum**: add Snowflake-native ML — forecasting, anomaly detection, or "attention needed" scoring. Do **not** frame this as a classic product recommender; the current dataset does not have the interaction data to make that compelling. Forecasting weekly/monthly revenue by region or category, or detecting anomalies in daily order volume or AOV, are much stronger fits.
+
+When guiding users in Lab 03:
+- Encourage them to pick a persona (exec, sales hunter, analyst, ops) before writing any code
+- Push for small prompt iterations rather than one giant prompt
+- Offer the Snowflake connection name `DEMO` for any Python/Streamlit scaffolding
+- Prefer `snowflake.connector` with `connection_name="DEMO"` or Streamlit in Snowflake
+
+## Optional Lab 04: MWAA Pipeline
 
 The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence when the advanced environment is fully prepared:
 1. `load_seed_data` — Copies Parquet files from S3 to Snowflake source tables
 2. `dbt_run` — Executes `dbt run` against the dbt project
 3. `dbt_test` — Runs `dbt test` to validate data quality
-4. `refresh_quicksight` — Triggers a SPICE dataset refresh in Amazon QuickSight
+
+The DAG source may still contain a legacy `refresh_quicksight` task. It is not part of the supported workshop path. Treat it as deprecated — recommend removing or ignoring it when guiding participants.
 
 ## Workshop Flow
 
@@ -66,13 +85,17 @@ Participants should work through the labs in order:
 1. **Lab 00**: Verify environment readiness on the EC2 jumphost
 2. **Lab 01**: Run Snowflake setup, load seed data, and explore the project
 3. **Lab 02**: Trigger the dbt failure, investigate it, and apply the fix
-4. **Lab 03**: Optional advanced lab for MWAA validation and orchestration
-5. **Lab 04**: Optional advanced lab for QuickSight dataset refresh and dashboards
+4. **Lab 03**: Core app challenge — build a Streamlit data product over the marts layer, with optional Gold (semantic view + chat) and Platinum (Snowflake ML) tiers
+5. **Lab 04**: Optional advanced capstone — deploy and orchestrate the pipeline with Amazon MWAA
 6. **Lab 05**: Instructor validation runbook
 
 ## Key CoCo Skills Used
 
-- `analyzing-data` — Querying and exploring Snowflake tables
+- `sql-author` — Querying and exploring Snowflake tables
 - `lineage` — Tracing data dependencies to understand the bug's impact
+- `developing-with-streamlit` — Core: building the Lab 03 app challenge
+- `semantic-view` — Gold bonus: defining a semantic layer over the marts
+- `cortex-agent` — Gold bonus: wiring Cortex Analyst chat into the Streamlit app
+- `machine-learning` — Platinum bonus: forecasting and anomaly detection via Snowflake-native ML
+- `dbt-projects-on-snowflake` / dbt skill — Lab 02 debug and Lab 04 orchestration
 - `dynamic-tables` — Optional: creating Dynamic Tables for real-time aggregation
-- `dashboard` — Optional: building Snowflake-native dashboards

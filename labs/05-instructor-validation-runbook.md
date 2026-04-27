@@ -60,13 +60,12 @@ Ask CoCo to run dbt from `dbt_project/`, confirm the initial failure on `fct_ord
 
 ## Optional Advanced Checks
 
-Run these only if you intend to include Labs 03 and 04.
+Run these only if you intend to include Lab 04 (MWAA orchestration). Lab 03 (the Streamlit app challenge) runs entirely on the jumphost and Snowflake, so no extra infrastructure checks are needed beyond the core path above.
 
 1. Verify the MWAA environment imports the DAG without provider or package errors.
 2. Verify MWAA workers have access to `snow`, `dbt`, the dbt project, and Snowflake credentials.
 3. Verify every Airflow Variable referenced by `dags/ecommerce_pipeline.py` is present.
-4. Verify the QuickSight dataset exists before the lab begins.
-5. Trigger the DAG once and confirm all tasks succeed without worker-side surgery.
+4. Trigger the DAG once and confirm `load_seed_data`, `dbt_run`, and `dbt_test` succeed without worker-side surgery. (Any legacy `refresh_quicksight` task should be removed or ignored — QuickSight is no longer part of the workshop.)
 
 ## Failure Checklist
 
@@ -79,7 +78,6 @@ Stop the workshop rollout if any of the following are true:
 - the dbt project does not fail first on the planted bug
 - MWAA workers do not have Snowflake auth, `snow`, or `dbt`
 - the MWAA environment is missing required provider packages
-- the QuickSight dataset does not already exist
 - the CloudFormation stack still leaves a placeholder trust policy that participants must understand in detail
 
 ## Recommended Participant Scope
@@ -89,5 +87,6 @@ Treat this as the guaranteed path for all participants:
 1. Lab 00: environment validation
 2. Lab 01: Snowflake setup, seed load, and repo exploration
 3. Lab 02: dbt bug investigation and fix
+4. Lab 03: From Pipeline to Product — Streamlit app challenge over the marts layer
 
-Treat Labs 03 and 04 as advanced or instructor-led unless the advanced checks above have been completed successfully.
+Treat Lab 04 (MWAA orchestration) as advanced or instructor-led unless the advanced checks above have been completed successfully.

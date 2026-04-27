@@ -6,14 +6,15 @@ An AWS Immersion Day workshop that teaches data engineers how to use Snowflake's
 
 ## Recommended Scope
 
-The novice-safe path in this repo is:
+The core path in this repo is:
 
 1. Connect to the EC2 jumphost and verify `cortex`, `snow`, and `aws`
 2. Run Snowflake setup and load the seed data from the public workshop S3 bucket
 3. Use CoCo to explore the repository, schemas, and lineage
 4. Reproduce and fix the planted dbt bug, then rerun the project
+5. Build a Streamlit data product on top of the clean marts layer (the **App Challenge**)
 
-Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced or instructor-led extensions. They are not part of the guaranteed completion path for every participant.
+Amazon MWAA orchestration and Iceberg/Glue content remain in the repo as advanced or instructor-led extensions. They are not part of the guaranteed completion path for every participant.
 
 ## Architecture
 
@@ -24,23 +25,24 @@ Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced
                           +----------+------------+
                                      |
             +------------------------+------------------------+
-            |                        |                        |
-   +--------v--------+    +---------v--------+    +----------v---------+
-   |  EC2 Jumphost    |    |  Amazon MWAA      |    |  Amazon QuickSight  |
-   |  (CoCo CLI +     |    |  (Airflow 2.9)    |    |  (SPICE Dashboard)  |
-   |   Snowflake CLI)  |    |                    |    |                     |
-   +--------+---------+    +---------+----------+    +----------+----------+
-            |                        |                          ^
-            |  CoCo drives           |  Orchestrates            |  SPICE refresh
-            |  all interactions      |  the pipeline            |  on completion
-            v                        v                          |
-   +--------+---------+    +---------+----------+               |
-   |  Snowflake        |    |  DAG Tasks:         |               |
-   |                    |    |  1. Load seed data  |               |
-   |  SOURCE_DATA       |    |  2. dbt run         +---------------+
-   |    raw_orders      |    |  3. dbt test        |
-   |    raw_customers   |    |  4. QS refresh      |
-   |    raw_products    |    +--------------------+
+            |                                                 |
+   +--------v--------+                              +---------v--------+
+   |  EC2 Jumphost    |                              |  Amazon MWAA      |
+   |  (CoCo CLI +     |                              |  (Airflow 2.9)    |
+   |   Snowflake CLI  |                              |  Optional Lab 04  |
+   |   + Streamlit)   |                              |                    |
+   +--------+---------+                              +---------+----------+
+            |                                                  |
+            |  CoCo drives                                     |  Orchestrates
+            |  core labs + app                                 |  the pipeline
+            v                                                  v
+   +--------+---------+                              +---------+----------+
+   |  Snowflake        |                              |  DAG Tasks:         |
+   |                    |                              |  1. Load seed data  |
+   |  SOURCE_DATA       |  <---------------------------+  2. dbt run         |
+   |    raw_orders      |                              |  3. dbt test        |
+   |    raw_customers   |                              +--------------------+
+   |    raw_products    |
    |    raw_order_items |
    |                    |
    |  STAGING           |
@@ -48,10 +50,10 @@ Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced
    |    stg_customers   |
    |    stg_order_items |
    |                    |
-   |  MARTS             |
-   |    fct_orders      |
-   |    dim_customers   |
-   +--------------------+
+   |  MARTS             |  <-- Streamlit App Challenge (Lab 03)
+   |    fct_orders      |      + optional semantic view
+   |    dim_customers   |      + optional Cortex chat
+   +--------------------+      + optional Snowflake ML
 ```
 
 ## What You'll Build
@@ -59,7 +61,8 @@ Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced
 1. **Explore source data** with CoCo CLI and inspect the Snowflake schemas created for the workshop
 2. **Understand model dependencies** across the dbt project and trace lineage from source to marts
 3. **Debug a broken dbt pipeline** by finding and fixing the planted column-name bug in the mart layer
-4. **Validate the workshop environment** so you can continue into advanced AWS orchestration labs if your sandbox is prepared for them
+4. **Build a data product** — a Streamlit app on top of the clean marts layer, with optional bonuses for a semantic view, a chat interface, and Snowflake-native ML
+5. **(Optional) Orchestrate the pipeline** with Amazon MWAA as an advanced capstone
 
 ## Prerequisites
 
@@ -67,7 +70,7 @@ Amazon MWAA, QuickSight, and Iceberg/Glue content remain in the repo as advanced
 |---|---|
 | AWS account | Provisioned via Workshop Studio CFn template |
 | Snowflake account | With Cortex Code enabled and a PAT (programmatic access token) |
-| Browser | For Session Manager terminal, Airflow UI, QuickSight, and Snowsight |
+| Browser | For Session Manager terminal, Streamlit app, Airflow UI, and Snowsight |
 
 No local software installation is required. All CLI work happens on a pre-provisioned EC2 jumphost accessed via AWS Systems Manager Session Manager.
 
@@ -81,7 +84,7 @@ Deploy the CloudFormation template via AWS Workshop Studio. Each participant sho
 
 The template now also stores the Snowflake credentials in AWS Secrets Manager so optional MWAA tasks can retrieve them without relying on an implicit shell variable.
 
-`MWAA`, `QuickSight`, and `Iceberg/Glue` resources are best treated as advanced extensions unless you have separately validated that the sandbox account includes the required runtime packages, credentials, and datasets.
+`MWAA` and `Iceberg/Glue` resources are best treated as advanced extensions unless you have separately validated that the sandbox account includes the required runtime packages and credentials.
 
 ```bash
 aws cloudformation deploy \
@@ -129,8 +132,8 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
 │   ├── 00-prework.md
 │   ├── 01-explore-and-setup.md
 │   ├── 02-fix-the-pipeline.md
-│   ├── 03-deploy-and-orchestrate.md
-│   └── 04-quicksight-refresh.md
+│   ├── 03-from-pipeline-to-product.md
+│   └── 04-deploy-and-orchestrate.md
 └── scripts/
     ├── bootstrap-ec2.sh         # EC2 UserData script (tested on Amazon Linux 2023)
     ├── load-seed-data.sh        # Upload local Parquet seed files into Snowflake
@@ -144,8 +147,8 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
 | 00 | Pre-Work | Connect to EC2, verify the workshop CLIs, and use a backup recovery one-liner if bootstrap failed |
 | 01 | Explore and Setup | Run Snowflake setup, load seed data from public S3, and inspect the source schemas |
 | 02 | Fix the Pipeline | Find and fix the dbt bug using CoCo's debugging skills |
-| 03 | Deploy and Orchestrate | Advanced lab: use Secrets Manager-backed MWAA auth and validate the orchestration runtime |
-| 04 | QuickSight Refresh | Advanced lab: verify a pre-created dataset and optional dashboard flow |
+| 03 | From Pipeline to Product | **App Challenge**: build a Streamlit data product on the marts layer; bonus tiers for semantic view, chat, and Snowflake ML |
+| 04 | Deploy and Orchestrate | Advanced capstone: deploy the dbt pipeline to Amazon MWAA and run it on a schedule |
 
 ## Instructor Validation
 
@@ -157,7 +160,7 @@ Before the workshop, validate the paved-road flow on a fresh EC2 host and a fres
 4. The public S3 seed-data flow loads the expected row counts consistently
 5. The dbt lab fails first on the planted bug, then succeeds after the single intended fix
 
-If you plan to run Labs 03 or 04, also validate MWAA worker dependencies, Secrets Manager access, dbt project availability on MWAA, and the QuickSight dataset before participants arrive.
+If you plan to run Lab 04, also validate MWAA worker dependencies, Secrets Manager access, and dbt project availability on MWAA before participants arrive.
 
 ## Dataset
 

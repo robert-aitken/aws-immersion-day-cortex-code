@@ -131,7 +131,7 @@ What's in this repository? Walk me through the architecture.
 CoCo should describe:
 - The dbt project with staging and mart models
 - The setup SQL that creates the Snowflake objects for the workshop
-- The optional MWAA and QuickSight files that are kept for advanced labs
+- The optional MWAA orchestration files kept for the advanced capstone lab
 
 ## Step 5: Explore the Source Data
 

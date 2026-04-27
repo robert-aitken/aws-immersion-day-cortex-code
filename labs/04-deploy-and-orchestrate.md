@@ -1,23 +1,32 @@
-# Lab 03: Deploy and Orchestrate
+# Lab 04: Deploy and Orchestrate Your Pipeline with Airflow
 
 **Duration**: 20-30 minutes
 
 ## Objective
 
-This is an advanced lab. Use it only if your instructor has already validated the MWAA environment, worker dependencies, Snowflake authentication strategy, and any required QuickSight assets.
+This is an advanced capstone lab. Use it only if your instructor has already validated the Amazon MWAA environment, worker dependencies, and Snowflake authentication strategy for your sandbox.
 
-The goal is to inspect the optional orchestration path, validate that the environment is actually runnable, and then trigger the DAG only if those prerequisites are satisfied.
+The goal is to take the now-fixed dbt pipeline and put it on a schedule: upload the DAG, wire up the Airflow Variables, trigger a run, and inspect the result.
 
 ## Before You Start
 
 Do not assume the CloudFormation stack is sufficient on its own. Confirm all of the following first:
 
 - The MWAA environment has the required Python packages and providers installed
-- The MWAA workers can access the workshop repo or packaged dbt project
-- Snowflake credentials are available to MWAA without manual worker-side edits
-- Any QuickSight dataset used by the DAG already exists
+- The MWAA workers can access the workshop repo or a packaged copy of the dbt project
+- Snowflake credentials are available to MWAA without manual worker-side edits (Secrets Manager is the recommended path)
 
 If any of these are missing, stop here and treat this as instructor-only content.
+
+## Pipeline Overview
+
+The DAG in `dags/ecommerce_pipeline.py` runs three tasks in sequence:
+
+1. `load_seed_data` — Copies Parquet files from S3 to the Snowflake source tables
+2. `dbt_run` — Executes `dbt run` against the dbt project
+3. `dbt_test` — Runs `dbt test` to validate data quality
+
+This is exactly the flow you ran by hand in Labs 01 and 02, just scheduled and observable.
 
 ## Step 1: Upload the DAG to MWAA
 
@@ -47,10 +56,8 @@ is in the CloudFormation stack outputs for coco-workshop.
 The DAG reads configuration from Airflow Variables. Set them via the AWS CLI:
 
 ```bash
-# Get MWAA environment name
 MWAA_ENV="coco-workshop-mwaa"
 
-# Set variables (replace with your actual values)
 aws mwaa invoke-rest-api \
   --name $MWAA_ENV \
   --method POST \
@@ -92,6 +99,7 @@ aws mwaa invoke-rest-api \
 ## Step 4: Trigger the DAG
 
 In the Airflow UI:
+
 1. Click the **play** button next to `ecommerce_pipeline`
 2. Click **Trigger DAG**
 
@@ -109,20 +117,20 @@ aws mwaa invoke-rest-api \
 
 Watch the DAG run in the Airflow UI:
 
-1. **load_seed_data** — Loads Parquet from S3 into Snowflake (should take ~30s)
-2. **dbt_run** — Runs all dbt models (should take ~15s)
-3. **dbt_test** — Validates data quality (should take ~10s)
-4. **refresh_quicksight** — Triggers SPICE refresh (should take ~30s)
+1. **load_seed_data** — Loads Parquet from S3 into Snowflake (~30s)
+2. **dbt_run** — Runs all dbt models (~15s)
+3. **dbt_test** — Validates data quality (~10s)
 
-If any task fails, click on the failed task and check the **Log** tab.
+If any task fails, click the failed task and check the **Log** tab.
 
 Expected high-risk failure modes in unprepared environments:
 
 - `snow: command not found`
 - `dbt: command not found`
 - missing Snowflake config or password on the MWAA worker
-- QuickSight operator import failures
-- missing dataset ID or Airflow Variables
+- missing Airflow Variables
+
+> **Note**: the DAG source in this repo may still contain an optional `refresh_quicksight` task. It is not part of the supported workshop path and should either be removed from the DAG or ignored. Participant-facing success for this lab ends at `dbt_test`.
 
 ## Step 6: Verify in Snowflake
 
@@ -134,6 +142,7 @@ How many rows are in the mart tables?
 ```
 
 Expected:
+
 | Schema | Table | Rows |
 |---|---|---|
 | SOURCE_DATA | RAW_ORDERS | ~10,000 |
@@ -149,6 +158,22 @@ Expected:
 ## What You've Learned
 
 - How to validate whether an MWAA environment is actually ready for workshop use
-- How to deploy Airflow DAGs to Amazon MWAA via S3 when the environment is prepared
+- How to deploy Airflow DAGs to Amazon MWAA via S3
 - How to configure Airflow Variables via the MWAA REST API
 - How to monitor and debug Airflow DAG runs
+- How to put the dbt pipeline you fixed earlier on a schedule
+
+## End-to-End Architecture (Completed)
+
+```
+S3 (Parquet)                    Snowflake                     Orchestration
+────────────     ────────────────────────────     ─────────────────────────
+seed data   ──→  SOURCE_DATA (raw tables)    ──→  MWAA triggers the
+                      │                           pipeline on schedule
+                      ▼
+                 STAGING (stg_ views)
+                      │
+                      ▼
+                 MARTS (fct + dim tables)     ──→  Streamlit app
+                                                   (from Lab 03)
+```

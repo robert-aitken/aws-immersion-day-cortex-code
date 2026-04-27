@@ -55,7 +55,7 @@ What other models are affected by this bug? Trace the lineage.
 
 CoCo should explain:
 - `fct_orders` fails → `dim_customers` also fails (it depends on `fct_orders`)
-- The QuickSight SPICE refresh would also fail (no data to refresh)
+- Anything that sits on top of the marts layer (a Streamlit app, a semantic view, a scheduled Airflow run) breaks for the same reason
 - This is a **cascade failure** from a single column-name typo
 
 ## Step 4: Fix the Bug
@@ -121,3 +121,9 @@ You should see customer data with realistic revenue figures.
 - How CoCo reads SQL models, traces column references, and identifies mismatches
 - The cascade effect of a single model failure in a dbt DAG
 - How CoCo can fix code directly, not just explain the problem
+
+## Next: From Pipeline to Product
+
+You now have a clean analytics layer in `COCO_WORKSHOP.MARTS`. In **Lab 03** you'll turn that pipeline into something a human can actually look at — a Streamlit app built with CoCo, with optional bonus tracks for a semantic view, a chat interface, and Snowflake-native ML.
+
+If you'd rather skip ahead to orchestration, **Lab 04** puts the same dbt pipeline on a schedule with Amazon MWAA.
