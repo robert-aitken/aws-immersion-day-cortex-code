@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS RAW_ORDER_ITEMS (
 COMMENT = 'Line-level order items';
 
 -- -------------------------------------------------------------------------
--- 7. File format and internal stage for seed data
+-- 7. File formats and stages for seed data
 -- -------------------------------------------------------------------------
 CREATE FILE FORMAT IF NOT EXISTS parquet_format
   TYPE = PARQUET;
@@ -117,6 +117,11 @@ CREATE FILE FORMAT IF NOT EXISTS parquet_format
 CREATE STAGE IF NOT EXISTS seed_stage
   FILE_FORMAT = parquet_format
   COMMENT = 'Internal stage for uploading seed Parquet files';
+
+CREATE STAGE IF NOT EXISTS public_seed_stage
+  URL = 's3://aws-immersion-day-cortex-code-public/data/seed/'
+  FILE_FORMAT = parquet_format
+  COMMENT = 'Public S3 stage for workshop seed Parquet files';
 
 -- -------------------------------------------------------------------------
 -- 8. Done — display summary

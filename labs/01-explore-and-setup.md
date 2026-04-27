@@ -39,15 +39,76 @@ You should end up with:
 | Database | `COCO_WORKSHOP` |
 | Schemas | `SOURCE_DATA`, `STAGING`, `MARTS` |
 | Source Tables | `RAW_CUSTOMERS`, `RAW_PRODUCTS`, `RAW_ORDERS`, `RAW_ORDER_ITEMS` |
-| Stage | `seed_stage` |
+| Stage | `seed_stage` (optional for local file loading) |
 
-## Step 3: Load Seed Data
+## Step 3: Load Seed Data from Public S3
 
-From the repo root:
+For the core workshop path, load the Parquet seed files directly from the public workshop bucket in `us-west-2`. This avoids shell-script and local-file issues.
 
-```bash
-cd ~/workshop
-./scripts/load-seed-data.sh
+Ask CoCo:
+
+```
+Create a stage over s3://aws-immersion-day-cortex-code-public/data/seed/ and load the four Parquet files into COCO_WORKSHOP.SOURCE_DATA.
+Then verify the row counts.
+```
+
+If you want to run it manually, use Snowflake SQL like this:
+
+```sql
+USE ROLE COCO_WORKSHOP_ROLE;
+USE WAREHOUSE COCO_WORKSHOP_WH;
+USE SCHEMA COCO_WORKSHOP.SOURCE_DATA;
+
+CREATE OR REPLACE FILE FORMAT public_parquet_format TYPE = PARQUET;
+
+CREATE OR REPLACE STAGE public_seed_stage
+  URL = 's3://aws-immersion-day-cortex-code-public/data/seed/'
+  FILE_FORMAT = public_parquet_format;
+
+TRUNCATE TABLE RAW_CUSTOMERS;
+COPY INTO RAW_CUSTOMERS
+FROM (
+  SELECT $1:customer_id::INT,
+         $1:first_name::VARCHAR,
+         $1:last_name::VARCHAR,
+         $1:email::VARCHAR,
+         $1:region::VARCHAR,
+         $1:signup_date::VARCHAR
+  FROM @public_seed_stage/raw_customers.parquet
+);
+
+TRUNCATE TABLE RAW_PRODUCTS;
+COPY INTO RAW_PRODUCTS
+FROM (
+  SELECT $1:product_id::INT,
+         $1:product_name::VARCHAR,
+         $1:category::VARCHAR,
+         $1:unit_price::DECIMAL(10,2)
+  FROM @public_seed_stage/raw_products.parquet
+);
+
+TRUNCATE TABLE RAW_ORDERS;
+COPY INTO RAW_ORDERS
+FROM (
+  SELECT $1:order_id::INT,
+         $1:customer_id::INT,
+         $1:order_date::VARCHAR,
+         $1:status::VARCHAR,
+         $1:total_amount::DECIMAL(12,2),
+         $1:created_at::VARCHAR
+  FROM @public_seed_stage/raw_orders.parquet
+);
+
+TRUNCATE TABLE RAW_ORDER_ITEMS;
+COPY INTO RAW_ORDER_ITEMS
+FROM (
+  SELECT $1:order_item_id::INT,
+         $1:order_id::INT,
+         $1:product_id::INT,
+         $1:quantity::INT,
+         $1:line_total::DECIMAL(12,2)
+  FROM @public_seed_stage/raw_order_items.parquet
+);
 ```
 
 Expected row counts:
@@ -69,7 +130,7 @@ What's in this repository? Walk me through the architecture.
 
 CoCo should describe:
 - The dbt project with staging and mart models
-- The scripts that bootstrap Snowflake setup and seed-data loading
+- The setup SQL that creates the Snowflake objects for the workshop
 - The optional MWAA and QuickSight files that are kept for advanced labs
 
 ## Step 5: Explore the Source Data
@@ -109,6 +170,6 @@ dim_customers   ← stg_customers + fct_orders
 ## What You've Learned
 
 - How to use CoCo CLI to run setup tasks and explore a repository
-- How to load Parquet data into Snowflake via an internal stage
+- How to load Parquet data into Snowflake from a public S3 stage
 - The core workshop architecture: source data -> staging -> marts
 - How dbt model dependencies work before you attempt the bug-fix lab

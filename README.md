@@ -9,7 +9,7 @@ An AWS Immersion Day workshop that teaches data engineers how to use Snowflake's
 The novice-safe path in this repo is:
 
 1. Connect to the EC2 jumphost and verify `cortex`, `snow`, and `aws`
-2. Run Snowflake setup and load the seed data
+2. Run Snowflake setup and load the seed data from the public workshop S3 bucket
 3. Use CoCo to explore the repository, schemas, and lineage
 4. Reproduce and fix the planted dbt bug, then rerun the project
 
@@ -79,6 +79,8 @@ Deploy the CloudFormation template via AWS Workshop Studio. Each participant sho
 - An EC2 jumphost with CoCo CLI and Snowflake CLI pre-installed
 - Snowflake credentials (account, user, PAT) for their demo account
 
+The template now also stores the Snowflake credentials in AWS Secrets Manager so optional MWAA tasks can retrieve them without relying on an implicit shell variable.
+
 `MWAA`, `QuickSight`, and `Iceberg/Glue` resources are best treated as advanced extensions unless you have separately validated that the sandbox account includes the required runtime packages, credentials, and datasets.
 
 ```bash
@@ -139,10 +141,10 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
 
 | Lab | Title | What You'll Do |
 |---|---|---|
-| 00 | Pre-Work | Connect to EC2, verify the workshop CLIs, and confirm the repo is present |
-| 01 | Explore and Setup | Run Snowflake setup, load seed data, and inspect the source schemas |
+| 00 | Pre-Work | Connect to EC2, verify the workshop CLIs, and use a backup recovery one-liner if bootstrap failed |
+| 01 | Explore and Setup | Run Snowflake setup, load seed data from public S3, and inspect the source schemas |
 | 02 | Fix the Pipeline | Find and fix the dbt bug using CoCo's debugging skills |
-| 03 | Deploy and Orchestrate | Advanced lab: validate MWAA assumptions before attempting orchestration |
+| 03 | Deploy and Orchestrate | Advanced lab: use Secrets Manager-backed MWAA auth and validate the orchestration runtime |
 | 04 | QuickSight Refresh | Advanced lab: verify a pre-created dataset and optional dashboard flow |
 
 ## Instructor Validation
@@ -152,14 +154,14 @@ Before the workshop, validate the paved-road flow on a fresh EC2 host and a fres
 1. `scripts/bootstrap-ec2.sh` leaves `cortex`, `snow`, and `aws` available to `ec2-user`
 2. `snow sql -c DEMO -q "SELECT CURRENT_ACCOUNT(), CURRENT_USER(), CURRENT_ROLE()"` succeeds without manual config edits
 3. `snow sql -c DEMO -f scripts/snowflake-setup.sql` completes successfully
-4. `./scripts/load-seed-data.sh` loads the expected row counts consistently
+4. The public S3 seed-data flow loads the expected row counts consistently
 5. The dbt lab fails first on the planted bug, then succeeds after the single intended fix
 
-If you plan to run Labs 03 or 04, also validate MWAA worker dependencies, Snowflake auth on MWAA, and the QuickSight dataset before participants arrive.
+If you plan to run Labs 03 or 04, also validate MWAA worker dependencies, Secrets Manager access, dbt project availability on MWAA, and the QuickSight dataset before participants arrive.
 
 ## Dataset
 
-E-commerce data with ~10,000 orders across 1,000 customers and 200 products. Provided as Parquet files in `data/seed/`.
+E-commerce data with ~10,000 orders across 1,000 customers and 200 products. The repo includes local Parquet copies in `data/seed/`, and the core lab now loads the same files from `s3://aws-immersion-day-cortex-code-public/data/seed/`.
 
 | Table | Rows | Description |
 |---|---|---|

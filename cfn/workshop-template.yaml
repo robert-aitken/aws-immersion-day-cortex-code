@@ -20,6 +20,11 @@ Parameters:
     NoEcho: true
     Description: Snowflake Programmatic Access Token
 
+  PublicSeedBucketName:
+    Type: String
+    Default: aws-immersion-day-cortex-code-public
+    Description: Public S3 bucket that hosts workshop seed Parquet files
+
   SnowflakeWarehouse:
     Type: String
     Default: COCO_WORKSHOP_WH
@@ -183,6 +188,12 @@ Resources:
                   - airflow:GetEnvironment
                   - airflow:ListEnvironments
                 Resource: !Sub 'arn:aws:airflow:${AWS::Region}:${AWS::AccountId}:environment/coco-workshop-mwaa'
+              - Sid: SecretsReadAccess
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Ref SnowflakeCredentialsSecret
       Tags:
         - Key: Project
           Value: coco-immersion-day
@@ -193,6 +204,14 @@ Resources:
       InstanceProfileName: coco-workshop-ec2-profile
       Roles:
         - !Ref EC2Role
+
+  SnowflakeCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 'coco-workshop/snowflake/${AWS::StackName}'
+      Description: Snowflake credentials for the CoCo workshop
+      SecretString: !Sub |
+        {"account":"${SnowflakeAccount}","user":"${SnowflakeUser}","password":"${SnowflakePAT}","role":"${SnowflakeRole}","warehouse":"${SnowflakeWarehouse}","database":"${SnowflakeDatabase}"}
 
   # -------------------------------------------------------------------------
   # IAM Role — Snowflake integration (storage + Glue catalog linked database)
@@ -425,6 +444,12 @@ Resources:
                   - glue:BatchCreatePartition
                   - lakeformation:GetDataAccess
                 Resource: '*'
+              - Sid: ReadSnowflakeSecret
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource: !Ref SnowflakeCredentialsSecret
       Tags:
         - Key: Project
           Value: coco-immersion-day
@@ -444,6 +469,7 @@ Resources:
       ExecutionRoleArn: !GetAtt MWAAExecutionRole.Arn
       AirflowConfigurationOptions:
         core.default_timezone: utc
+        secrets.backend: airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend
       LoggingConfiguration:
         DagProcessingLogs:
           Enabled: true
@@ -625,6 +651,14 @@ Outputs:
   WorkshopBucketName:
     Description: S3 bucket for DAGs and seed data
     Value: !Ref WorkshopBucket
+
+  PublicSeedBucketName:
+    Description: Public S3 bucket hosting workshop seed Parquet files
+    Value: !Ref PublicSeedBucketName
+
+  SnowflakeCredentialsSecretArn:
+    Description: Secrets Manager ARN containing Snowflake workshop credentials
+    Value: !Ref SnowflakeCredentialsSecret
 
   SnowflakeAccountParam:
     Description: Snowflake account used for this workshop

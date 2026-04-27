@@ -11,10 +11,11 @@ Deployed to MWAA via S3: s3://<workshop-bucket>/dags/ecommerce_pipeline.py
 """
 
 from datetime import datetime, timedelta
+import json
 
+import boto3
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.operators.quicksight import (
     QuickSightCreateIngestionOperator,
 )
@@ -32,9 +33,20 @@ WORKSHOP_BUCKET = Variable.get("workshop_bucket", default_var="coco-workshop-buc
 AWS_ACCOUNT_ID = Variable.get("aws_account_id", default_var="000000000000")
 QS_DATASET_ID = Variable.get("quicksight_dataset_id", default_var="coco-workshop-dataset")
 AWS_REGION = Variable.get("aws_region", default_var="us-west-2")
+PUBLIC_SEED_BUCKET = Variable.get("public_seed_bucket", default_var="aws-immersion-day-cortex-code-public")
+SNOWFLAKE_SECRET_ID = Variable.get(
+    "snowflake_secret_id",
+    default_var="coco-workshop/snowflake/coco-workshop",
+)
 
-# Snow CLI connection flag (uses config.toml on the MWAA worker)
-SNOW_CONN = "-c DEMO"
+
+def get_snowflake_credentials():
+    secrets_client = boto3.client("secretsmanager", region_name=AWS_REGION)
+    secret_value = secrets_client.get_secret_value(SecretId=SNOWFLAKE_SECRET_ID)
+    return json.loads(secret_value["SecretString"])
+
+
+SNOWFLAKE_CREDS = get_snowflake_credentials()
 
 # ---------------------------------------------------------------------------
 # SQL to load seed data from S3 stage into Snowflake
@@ -49,7 +61,7 @@ CREATE OR REPLACE FILE FORMAT {SNOWFLAKE_DATABASE}.SOURCE_DATA.parquet_format
 
 -- Create stage pointing to the workshop S3 bucket
 CREATE OR REPLACE STAGE {SNOWFLAKE_DATABASE}.SOURCE_DATA.workshop_stage
-  URL = 's3://{WORKSHOP_BUCKET}/data/seed/'
+  URL = 's3://{PUBLIC_SEED_BUCKET}/data/seed/'
   FILE_FORMAT = {SNOWFLAKE_DATABASE}.SOURCE_DATA.parquet_format;
 
 -- Load raw_customers
@@ -120,7 +132,13 @@ with DAG(
         task_id="load_seed_data",
         bash_command=f"""
             export PATH=$HOME/.local/bin:$PATH
-            snow sql {SNOW_CONN} -q "{LOAD_SEED_SQL.replace(chr(10), ' ')}"
+            mkdir -p $HOME/.snowflake
+            printf 'default_connection_name = "DEMO"\n\n[connections.DEMO]\naccount = "%s"\nuser = "%s"\npassword = "%s"\nrole = "%s"\nwarehouse = "%s"\ndatabase = "%s"\n' \
+              '{SNOWFLAKE_CREDS["account"]}' '{SNOWFLAKE_CREDS["user"]}' '{SNOWFLAKE_CREDS["password"]}' \
+              '{SNOWFLAKE_CREDS["role"]}' '{SNOWFLAKE_CREDS["warehouse"]}' '{SNOWFLAKE_CREDS["database"]}' \
+              > $HOME/.snowflake/config.toml
+            chmod 600 $HOME/.snowflake/config.toml
+            snow sql -c DEMO -q "{LOAD_SEED_SQL.replace(chr(10), ' ')}"
         """,
     )
 
@@ -130,9 +148,9 @@ with DAG(
         bash_command=f"""
             export PATH=$HOME/.local/bin:$PATH
             cd ~/workshop/dbt_project
-            export SNOWFLAKE_ACCOUNT='{SNOWFLAKE_ACCOUNT}'
-            export SNOWFLAKE_USER='{SNOWFLAKE_USER}'
-            export SNOWFLAKE_PASSWORD='$SNOWFLAKE_PAT'
+            export SNOWFLAKE_ACCOUNT='{SNOWFLAKE_CREDS["account"]}'
+            export SNOWFLAKE_USER='{SNOWFLAKE_CREDS["user"]}'
+            export SNOWFLAKE_PASSWORD='{SNOWFLAKE_CREDS["password"]}'
             dbt run --profiles-dir . --project-dir .
         """,
     )
@@ -143,9 +161,9 @@ with DAG(
         bash_command=f"""
             export PATH=$HOME/.local/bin:$PATH
             cd ~/workshop/dbt_project
-            export SNOWFLAKE_ACCOUNT='{SNOWFLAKE_ACCOUNT}'
-            export SNOWFLAKE_USER='{SNOWFLAKE_USER}'
-            export SNOWFLAKE_PASSWORD='$SNOWFLAKE_PAT'
+            export SNOWFLAKE_ACCOUNT='{SNOWFLAKE_CREDS["account"]}'
+            export SNOWFLAKE_USER='{SNOWFLAKE_CREDS["user"]}'
+            export SNOWFLAKE_PASSWORD='{SNOWFLAKE_CREDS["password"]}'
             dbt test --profiles-dir . --project-dir .
         """,
     )
