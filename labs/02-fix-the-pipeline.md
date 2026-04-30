@@ -4,7 +4,11 @@
 
 ## Objective
 
-This is the core lab. You'll trigger the dbt pipeline, observe it fail, and use CoCo CLI to debug and fix the issue.
+This is the lab where CoCo earns its keep. A broken dbt model is blocking the entire mart layer — the same kind of issue that wakes you up at 2 AM when a dashboard goes blank or an Airflow task turns red.
+
+You'll trigger the failure, use CoCo to investigate (instead of manually grepping through SQL files), understand the cascade impact, fix it, and prove the pipeline is green. This is the debugging workflow you'll take back to your own projects.
+
+> **Prerequisite**: Complete [Lab 01](01-explore-and-setup.md) — you need the seed data loaded and the dbt project ready.
 
 ## Step 1: Try Running dbt
 
@@ -32,7 +36,7 @@ The `dim_customers` model will also fail because it depends on `fct_orders`.
 
 ## Step 2: Ask CoCo to Debug
 
-This is where CoCo shines. Ask it to investigate:
+This is where CoCo shines. Instead of manually opening SQL files and tracing column names by hand, ask it to investigate:
 
 ```
 My dbt pipeline failed on the fct_orders model with an invalid identifier error.
@@ -45,7 +49,11 @@ CoCo will:
 3. Check the `order_totals` CTE and see the column is actually named `ORDER_TOTAL`
 4. Explain the mismatch
 
+On a real project this would save you 10-20 minutes of file navigation. On a large project with dozens of CTEs and models, it saves a lot more.
+
 ## Step 3: Understand the Impact
+
+Before fixing anything, understand what's broken downstream. This is a key practice in production incident response — you want to know the blast radius.
 
 Ask CoCo about the downstream effects:
 
@@ -124,6 +132,10 @@ You should see customer data with realistic revenue figures.
 
 ## Next: From Pipeline to Product
 
-You now have a clean analytics layer in `COCO_WORKSHOP.MARTS`. In **Lab 03** you'll turn that pipeline into something a human can actually look at — a Streamlit app built with CoCo, with optional bonus tracks for a semantic view, a chat interface, and Snowflake-native ML.
+You now have a clean analytics layer in `COCO_WORKSHOP.MARTS`. In **[Lab 03](03-from-pipeline-to-product.md)** you'll turn that pipeline into something a human can actually look at — a Streamlit app built with CoCo, with optional bonus tracks for a semantic view, a chat interface, and Snowflake-native ML.
 
-If you'd rather skip ahead to orchestration, **Lab 04** puts the same dbt pipeline on a schedule with Amazon MWAA.
+If you'd rather skip ahead to orchestration, **[Lab 04](04-deploy-and-orchestrate.md)** puts the same dbt pipeline on a schedule with Amazon MWAA.
+
+---
+
+**Previous**: [Lab 01: Explore and Setup](01-explore-and-setup.md) | **Next**: [Lab 03: From Pipeline to Product](03-from-pipeline-to-product.md)

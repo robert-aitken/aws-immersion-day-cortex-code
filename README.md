@@ -2,19 +2,23 @@
 
 **Hands-On with Cortex Code CLI**
 
-An AWS Immersion Day workshop that teaches data engineers how to use Snowflake's Cortex Code (CoCo) CLI to inspect data, run setup tasks, debug a dbt project, and validate a simple AWS-backed workshop environment.
+## What is Cortex Code?
 
-## Recommended Scope
+[Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (CoCo) is Snowflake's AI-powered CLI for data engineering. Think of it as an always-available teammate that can read your project, query your warehouse, trace lineage, debug failing models, write code, and deploy apps — all from your terminal.
 
-The core path in this repo is:
+In this workshop you'll use CoCo the way you'd use it on a real team: to ramp up on an unfamiliar data project, track down a production bug, fix it, and then ship something useful on top of the clean data. By the end you'll have a working Streamlit app, and you'll know how to bring the same workflow back to your own pipelines.
 
-1. Connect to the EC2 jumphost and verify `cortex`, `snow`, and `aws`
-2. Run Snowflake setup and load the seed data from the public workshop S3 bucket
-3. Use CoCo to explore the repository, schemas, and lineage
-4. Reproduce and fix the planted dbt bug, then rerun the project
-5. Build a Streamlit data product on top of the clean marts layer (the **App Challenge**)
+## Workshop Path
 
-Amazon MWAA orchestration and Iceberg/Glue content remain in the repo as advanced or instructor-led extensions. They are not part of the guaranteed completion path for every participant.
+| # | Lab | What you'll do | Link |
+|---|---|---|---|
+| 00 | **Pre-Work** | Connect to your jumphost and confirm the toolchain is ready | [labs/00-prework.md](labs/00-prework.md) |
+| 01 | **Explore and Setup** | Load e-commerce data into Snowflake and get oriented in the project | [labs/01-explore-and-setup.md](labs/01-explore-and-setup.md) |
+| 02 | **Fix the Pipeline** | Find and fix a dbt bug — the same kind of thing that pages you at 2 AM | [labs/02-fix-the-pipeline.md](labs/02-fix-the-pipeline.md) |
+| 03 | **From Pipeline to Product** | Build a Streamlit app on the clean marts — the **App Challenge** with a prize | [labs/03-from-pipeline-to-product.md](labs/03-from-pipeline-to-product.md) |
+| 04 | **Deploy and Orchestrate** | *(Advanced)* Put the pipeline on a schedule with Amazon MWAA | [labs/04-deploy-and-orchestrate.md](labs/04-deploy-and-orchestrate.md) |
+
+Labs 00–03 are the core path every participant will complete. Lab 04 is an advanced capstone for environments where MWAA has been pre-validated by an instructor.
 
 ## Architecture
 
@@ -56,13 +60,11 @@ Amazon MWAA orchestration and Iceberg/Glue content remain in the repo as advance
    +--------------------+      + optional Snowflake ML
 ```
 
-## What You'll Build
+## What You'll Walk Away With
 
-1. **Explore source data** with CoCo CLI and inspect the Snowflake schemas created for the workshop
-2. **Understand model dependencies** across the dbt project and trace lineage from source to marts
-3. **Debug a broken dbt pipeline** by finding and fixing the planted column-name bug in the mart layer
-4. **Build a data product** — a Streamlit app on top of the clean marts layer, with optional bonuses for a semantic view, a chat interface, and Snowflake-native ML
-5. **(Optional) Orchestrate the pipeline** with Amazon MWAA as an advanced capstone
+1. **A working debugging workflow** — you'll see how CoCo reads SQL, traces lineage, and fixes models without you manually grepping through files
+2. **A shipped data product** — a Streamlit in Snowflake app that turns raw data into something a stakeholder can actually use
+3. **Repeatable patterns** — everything here (dbt debug, semantic views, ML scoring, Airflow orchestration) maps directly to work you do on your own pipelines
 
 ## Prerequisites
 
@@ -72,32 +74,19 @@ Amazon MWAA orchestration and Iceberg/Glue content remain in the repo as advance
 | Snowflake account | With Cortex Code enabled and a PAT (programmatic access token) |
 | Browser | For Session Manager terminal, Streamlit app, Airflow UI, and Snowsight |
 
-No local software installation is required. All CLI work happens on a pre-provisioned EC2 jumphost accessed via AWS Systems Manager Session Manager.
+No local software installation required. All CLI work happens on a pre-provisioned EC2 jumphost accessed via AWS Systems Manager Session Manager.
 
-## Deployment
+## Getting Started
 
 ### Instructor-Led (Recommended)
 
-Deploy the CloudFormation template via AWS Workshop Studio. Each participant should receive:
+Your instructor will deploy the CloudFormation template via AWS Workshop Studio. You'll receive:
 - An EC2 jumphost with CoCo CLI and Snowflake CLI pre-installed
-- Snowflake credentials (account, user, PAT) for their demo account
+- Snowflake credentials (account, user, PAT) for your demo account
 
-The template now also stores the Snowflake credentials in AWS Secrets Manager so optional MWAA tasks can retrieve them without relying on an implicit shell variable.
+Then head straight to [Lab 00: Pre-Work](labs/00-prework.md).
 
-`MWAA` and `Iceberg/Glue` resources are best treated as advanced extensions unless you have separately validated that the sandbox account includes the required runtime packages and credentials.
-
-```bash
-aws cloudformation deploy \
-  --template-file cfn/workshop-template.yaml \
-  --stack-name coco-workshop \
-  --parameter-overrides \
-    SnowflakeAccount=YOUR_ACCOUNT \
-    SnowflakeUser=YOUR_USER \
-    SnowflakePAT=YOUR_PAT \
-  --capabilities CAPABILITY_NAMED_IAM
-```
-
-### Self-Paced with CoCo
+### Self-Paced
 
 Clone this repo on a machine with CoCo CLI installed and let CoCo guide you:
 
@@ -107,7 +96,7 @@ cd aws-immersion-day-cortex-code
 cortex
 ```
 
-CoCo will read the `AGENTS.md` file and understand the full workshop context, then walk you through each lab at your own pace.
+CoCo reads the `AGENTS.md` file and understands the full workshop context, then walks you through each lab at your own pace.
 
 ## Repository Structure
 
@@ -140,15 +129,18 @@ CoCo will read the `AGENTS.md` file and understand the full workshop context, th
     └── snowflake-setup.sql      # Create the workshop Snowflake objects
 ```
 
-## Labs Overview
+## Dataset
 
-| Lab | Title | What You'll Do |
+E-commerce data spanning 2024–2025: ~10,000 orders across 1,000 customers and 200 products, with ~35,000 line items. The data has enough depth for meaningful analytics — regional trends, customer concentration, category shifts — and a few surprises worth finding.
+
+| Table | Rows | Description |
 |---|---|---|
-| 00 | Pre-Work | Connect to EC2, verify the workshop CLIs, and use a backup recovery one-liner if bootstrap failed |
-| 01 | Explore and Setup | Run Snowflake setup, load seed data from public S3, and inspect the source schemas |
-| 02 | Fix the Pipeline | Find and fix the dbt bug using CoCo's debugging skills |
-| 03 | From Pipeline to Product | **App Challenge**: build a Streamlit data product on the marts layer; bonus tiers for semantic view, chat, and Snowflake ML |
-| 04 | Deploy and Orchestrate | Advanced capstone: deploy the dbt pipeline to Amazon MWAA and run it on a schedule |
+| `raw_orders` | ~10,000 | Order headers (order_id, customer_id, order_date, status, total_amount) |
+| `raw_customers` | ~1,000 | Customer records (customer_id, name, email, region, signup_date) |
+| `raw_products` | ~200 | Product catalog (product_id, name, category, unit_price) |
+| `raw_order_items` | ~35,000 | Line items (order_item_id, order_id, product_id, quantity, line_total) |
+
+Seed data lives locally in `data/seed/` and is also served from `s3://aws-immersion-day-cortex-code-public/data/seed/`.
 
 ## Instructor Validation
 
@@ -161,17 +153,6 @@ Before the workshop, validate the paved-road flow on a fresh EC2 host and a fres
 5. The dbt lab fails first on the planted bug, then succeeds after the single intended fix
 
 If you plan to run Lab 04, also validate MWAA worker dependencies, Secrets Manager access, and dbt project availability on MWAA before participants arrive.
-
-## Dataset
-
-E-commerce data with ~10,000 orders across 1,000 customers and 200 products. The repo includes local Parquet copies in `data/seed/`, and the core lab now loads the same files from `s3://aws-immersion-day-cortex-code-public/data/seed/`.
-
-| Table | Rows | Description |
-|---|---|---|
-| `raw_orders` | ~10,000 | Order headers (order_id, customer_id, order_date, status, total_amount) |
-| `raw_customers` | ~1,000 | Customer records (customer_id, name, email, region, signup_date) |
-| `raw_products` | ~200 | Product catalog (product_id, name, category, unit_price) |
-| `raw_order_items` | ~35,000 | Line items (order_item_id, order_id, product_id, quantity, line_total) |
 
 ## Cleanup
 

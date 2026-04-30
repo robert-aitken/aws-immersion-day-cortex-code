@@ -2,6 +2,8 @@
 
 **Duration**: 45-60 minutes
 
+> **Prerequisite**: Complete [Lab 02](02-fix-the-pipeline.md) first — you need a working marts layer.
+
 ## Objective
 
 You just fixed a broken dbt pipeline and now have a clean analytics layer in the `MARTS` schema. In this lab you'll turn that pipeline into something a human can actually look at and interact with.
@@ -258,3 +260,7 @@ When time is called:
 - How to call Snowflake-native ML functions from SQL to add forecasting or anomaly detection
 - Why picking a persona first makes the final app much more useful than "build a dashboard"
 - How to find non-obvious business insights by combining the right charts, aggregations, and ML techniques
+
+---
+
+**Previous**: [Lab 02: Fix the Pipeline](02-fix-the-pipeline.md) | **Next (advanced)**: [Lab 04: Deploy and Orchestrate](04-deploy-and-orchestrate.md)

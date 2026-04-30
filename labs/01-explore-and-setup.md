@@ -4,11 +4,11 @@
 
 ## Objective
 
-Use CoCo CLI to run the Snowflake setup, load the seed data, explore the workshop
-repository, and understand the core dbt pipeline before you debug it.
+Every data engineering workflow starts the same way: understand what you're working with. In this lab you'll use CoCo to stand up the Snowflake environment, load real e-commerce data, and explore the project structure — the same "day one on a new codebase" pattern you'd follow at work, just faster.
 
-> **Prerequisite**: You should have completed Lab 00 and confirmed the EC2 jumphost,
-> CLI tools, and Snowflake connection are ready.
+By the end you'll know what tables exist, what the dbt pipeline does, and how models depend on each other. That context is what makes the debugging lab (Lab 02) feel natural rather than mechanical.
+
+> **Prerequisite**: Complete [Lab 00](00-prework.md) first — you need a working jumphost and Snowflake connection.
 
 ## Step 1: Launch CoCo CLI
 
@@ -19,7 +19,7 @@ cd ~/workshop
 cortex -c DEMO
 ```
 
-CoCo will automatically read the `AGENTS.md` file and understand the workshop context.
+CoCo reads the `AGENTS.md` file on startup and immediately understands the workshop layout, Snowflake objects, and dbt project structure. This is the same pattern you'd use on your own repos — drop an `AGENTS.md` in the root and CoCo gets context without you re-explaining the project every session.
 
 ## Step 2: Create the Snowflake Workshop Objects
 
@@ -169,7 +169,11 @@ dim_customers   ← stg_customers + fct_orders
 
 ## What You've Learned
 
-- How to use CoCo CLI to run setup tasks and explore a repository
+- How to use CoCo CLI to run setup tasks and explore a repository you've never seen before
 - How to load Parquet data into Snowflake from a public S3 stage
-- The core workshop architecture: source data -> staging -> marts
-- How dbt model dependencies work before you attempt the bug-fix lab
+- The core workshop architecture: source data → staging → marts
+- How dbt model dependencies work — this context will make the next lab's debugging feel intuitive
+
+---
+
+**Previous**: [Lab 00: Pre-Work](00-prework.md) | **Next**: [Lab 02: Fix the Pipeline](02-fix-the-pipeline.md)

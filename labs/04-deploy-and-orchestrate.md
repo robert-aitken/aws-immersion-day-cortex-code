@@ -2,11 +2,13 @@
 
 **Duration**: 20-30 minutes
 
+> **Prerequisite**: Complete [Lab 02](02-fix-the-pipeline.md) (fixed dbt pipeline) and ideally [Lab 03](03-from-pipeline-to-product.md) (Streamlit app). This lab is an advanced capstone for environments where an instructor has validated MWAA.
+
 ## Objective
 
-This is an advanced capstone lab. Use it only if your instructor has already validated the Amazon MWAA environment, worker dependencies, and Snowflake authentication strategy for your sandbox.
+In the real world, nobody runs `dbt run` by hand forever. Once your pipeline works, you schedule it so data flows automatically. This lab puts the fixed dbt pipeline on a schedule using Amazon MWAA (Managed Workflows for Apache Airflow) — the same orchestration pattern used in production environments.
 
-The goal is to take the now-fixed dbt pipeline and put it on a schedule: upload the DAG, wire up the Airflow Variables, trigger a run, and inspect the result.
+You'll upload the DAG, wire up the Airflow Variables, trigger a run, and watch it complete.
 
 ## Before You Start
 
@@ -177,3 +179,7 @@ seed data   ──→  SOURCE_DATA (raw tables)    ──→  MWAA triggers the
                  MARTS (fct + dim tables)     ──→  Streamlit app
                                                    (from Lab 03)
 ```
+
+---
+
+**Previous**: [Lab 03: From Pipeline to Product](03-from-pipeline-to-product.md)

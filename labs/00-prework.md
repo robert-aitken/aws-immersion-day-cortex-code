@@ -4,8 +4,9 @@
 
 ## Objective
 
-Verify your EC2 jumphost is ready, confirm the workshop CLIs are already installed,
-and make sure the Snowflake connection is working before you begin the core labs.
+Before we start building, let's make sure the tools are ready. This lab confirms your EC2 jumphost, CLIs, and Snowflake connection are all working.
+
+The jumphost is the environment that gives us a consistent way to access Cortex Code CLI across both Snowflake and AWS services. While we're using it for a clean lab experience, you can also run CoCo from any terminal — VS Code, Cursor, your local Mac/Linux/Windows shell, or even a CI/CD runner.
 
 ## Step 1: Connect to Your EC2 Jumphost
 
@@ -95,3 +96,7 @@ Lab 01 handles the Snowflake setup and seed-data load in one guided flow. In thi
 | Session Manager can't find instance | Wait 2-3 minutes for SSM agent to register, then refresh |
 
 Once all checks pass, you're ready for the workshop.
+
+---
+
+**Next**: [Lab 01: Explore and Setup](01-explore-and-setup.md)

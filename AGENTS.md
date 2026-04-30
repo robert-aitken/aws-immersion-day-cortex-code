@@ -6,7 +6,7 @@ project, and building a Streamlit data product on top of the clean marts layer.
 
 Amazon MWAA and Iceberg/Glue content exist in this repo as advanced or
 instructor-led extensions and should not be treated as guaranteed participant
-outcomes. QuickSight has been removed from the participant journey.
+outcomes.
 
 ## Repository Layout
 
@@ -138,7 +138,7 @@ The Airflow DAG `ecommerce_pipeline` runs these tasks in sequence when the advan
 2. `dbt_run` — Executes `dbt run` against the dbt project
 3. `dbt_test` — Runs `dbt test` to validate data quality
 
-The DAG runs 3 tasks: `load_seed_data`, `dbt_run`, `dbt_test`. QuickSight is no longer part of the workshop.
+The DAG runs 3 tasks: `load_seed_data`, `dbt_run`, `dbt_test`.
 
 ## Workshop Flow
 
