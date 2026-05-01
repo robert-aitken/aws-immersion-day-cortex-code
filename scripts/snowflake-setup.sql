@@ -109,14 +109,10 @@ CREATE TABLE IF NOT EXISTS RAW_ORDER_ITEMS (
 COMMENT = 'Line-level order items';
 
 -- -------------------------------------------------------------------------
--- 7. File formats and stages for seed data
+-- 7. File format and external stage for seed data
 -- -------------------------------------------------------------------------
 CREATE FILE FORMAT IF NOT EXISTS parquet_format
   TYPE = PARQUET;
-
-CREATE STAGE IF NOT EXISTS seed_stage
-  FILE_FORMAT = parquet_format
-  COMMENT = 'Internal stage for uploading seed Parquet files';
 
 CREATE STAGE IF NOT EXISTS public_seed_stage
   URL = 's3://aws-immersion-day-cortex-code-public/data/seed/'
@@ -124,7 +120,71 @@ CREATE STAGE IF NOT EXISTS public_seed_stage
   COMMENT = 'Public S3 stage for workshop seed Parquet files';
 
 -- -------------------------------------------------------------------------
--- 8. Done — display summary
+-- 8. Load seed data from public S3 stage into source tables
+-- -------------------------------------------------------------------------
+TRUNCATE TABLE IF EXISTS RAW_CUSTOMERS;
+COPY INTO RAW_CUSTOMERS
+FROM (
+  SELECT $1:customer_id::INT,
+         $1:first_name::VARCHAR,
+         $1:last_name::VARCHAR,
+         $1:email::VARCHAR,
+         $1:region::VARCHAR,
+         $1:signup_date::VARCHAR
+  FROM @public_seed_stage/raw_customers.parquet
+)
+FILE_FORMAT = (TYPE = PARQUET);
+
+TRUNCATE TABLE IF EXISTS RAW_PRODUCTS;
+COPY INTO RAW_PRODUCTS
+FROM (
+  SELECT $1:product_id::INT,
+         $1:product_name::VARCHAR,
+         $1:category::VARCHAR,
+         $1:unit_price::DECIMAL(10,2)
+  FROM @public_seed_stage/raw_products.parquet
+)
+FILE_FORMAT = (TYPE = PARQUET);
+
+TRUNCATE TABLE IF EXISTS RAW_ORDERS;
+COPY INTO RAW_ORDERS
+FROM (
+  SELECT $1:order_id::INT,
+         $1:customer_id::INT,
+         $1:order_date::VARCHAR,
+         $1:status::VARCHAR,
+         $1:total_amount::DECIMAL(12,2),
+         $1:created_at::VARCHAR
+  FROM @public_seed_stage/raw_orders.parquet
+)
+FILE_FORMAT = (TYPE = PARQUET);
+
+TRUNCATE TABLE IF EXISTS RAW_ORDER_ITEMS;
+COPY INTO RAW_ORDER_ITEMS
+FROM (
+  SELECT $1:order_item_id::INT,
+         $1:order_id::INT,
+         $1:product_id::INT,
+         $1:quantity::INT,
+         $1:line_total::DECIMAL(12,2)
+  FROM @public_seed_stage/raw_order_items.parquet
+)
+FILE_FORMAT = (TYPE = PARQUET);
+
+-- -------------------------------------------------------------------------
+-- 9. Verify row counts
+-- -------------------------------------------------------------------------
+SELECT 'RAW_CUSTOMERS'    AS table_name, COUNT(*) AS row_count FROM RAW_CUSTOMERS
+UNION ALL
+SELECT 'RAW_PRODUCTS',    COUNT(*) FROM RAW_PRODUCTS
+UNION ALL
+SELECT 'RAW_ORDERS',      COUNT(*) FROM RAW_ORDERS
+UNION ALL
+SELECT 'RAW_ORDER_ITEMS', COUNT(*) FROM RAW_ORDER_ITEMS
+ORDER BY table_name;
+
+-- -------------------------------------------------------------------------
+-- 10. Done — display summary
 -- -------------------------------------------------------------------------
 SELECT 'Setup complete' AS status,
        CURRENT_ACCOUNT() AS account,
