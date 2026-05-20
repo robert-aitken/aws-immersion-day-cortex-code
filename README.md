@@ -19,7 +19,7 @@ My main takeaways were:
 - deploying a Streamlit in Snowflake app on top of mart tables
 - using Kiro CLI to deploy an Airflow DAG to S3 through a conversational CLI workflow
 
-The most relevant concepts for my own work are the Snowflake and dbt workflow patterns, AI-assisted debugging, faster project onboarding, and assistant-led data engineering workflows. Although this workshop used AWS for orchestration, the same high-level patterns could be adapted to other cloud stacks, including Azure-based environments.
+The most relevant concepts are the Snowflake and dbt workflow patterns, AI-assisted debugging, faster project onboarding, and assistant-led data engineering workflows. Although this workshop used AWS for orchestration, the same high-level patterns could be adapted to other cloud stacks, including Azure-based environments.
 
 ## What is Cortex Code?
 
