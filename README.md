@@ -2,6 +2,25 @@
 
 **Hands-On with Cortex Code CLI**
 
+## Personal note on this fork
+
+I completed the [Snowflake AWS Immersion Day](https://www.snowflake.com/event/aws-immersion-day-2026-05-20/) on Wednesday 20 May 2026.
+
+This was a hands-on, CLI-led data engineering workshop focused on using Snowflake Cortex Code and Kiro CLI to work through a realistic Snowflake, dbt and AWS pipeline scenario.
+
+The workflow was primarily driven through AI-assisted CLI tools, with Snowflake and dbt as the core data engineering environment and AWS used for pipeline orchestration.
+
+My main takeaways were:
+
+- using Cortex Code as a Snowflake and dbt-focused AI assistant, similar in concept to GitHub Copilot but more heavily optimised for Snowflake, SQL, dbt projects and data workflows
+- loading Parquet source data from S3 into Snowflake
+- building raw, staging and mart layers with dbt
+- debugging a failing dbt model using AI-assisted SQL investigation and lineage-style reasoning
+- deploying a Streamlit in Snowflake app on top of mart tables
+- using Kiro CLI to deploy an Airflow DAG to S3 through a conversational CLI workflow
+
+The most relevant concepts for my own work are the Snowflake and dbt workflow patterns, AI-assisted debugging, faster project onboarding, and assistant-led data engineering workflows. Although this workshop used AWS for orchestration, the same high-level patterns could be adapted to other cloud stacks, including Azure-based environments.
+
 ## What is Cortex Code?
 
 [Cortex Code](https://docs.snowflake.com/en/user-guide/cortex-code) (CoCo) is Snowflake's AI-powered CLI for data engineering. Think of it as an always-available teammate that can read your project, query your warehouse, trace lineage, debug failing models, write code, and deploy apps — all from your terminal.
